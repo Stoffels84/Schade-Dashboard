@@ -1,0 +1,5 @@
+{
+  "name": "Chauffeur Schade Tracker",
+  "description": "Dashboard voor het bijhouden en analyseren van schades gereden door chauffeurs vanuit Excel (.xlsm) bestanden.",
+  "requestFramePermissions": []
+}
