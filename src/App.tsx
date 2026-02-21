@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
-  Database
+  Database,
+  Clock
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -34,7 +35,9 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  LineChart,
+  Line
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { DamageRecord, DashboardStats } from './types';
@@ -43,9 +46,10 @@ import { cn } from './lib/utils';
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export default function App() {
-  const [activePage, setActivePage] = useState<'dashboard' | 'topcrashers' | 'locatie' | 'voertuig'>('dashboard');
+  const [activePage, setActivePage] = useState<'dashboard' | 'topcrashers' | 'locatie' | 'voertuig' | 'seniority'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [data, setData] = useState<DamageRecord[]>([]);
+  const [seniorityData, setSeniorityData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -125,6 +129,9 @@ export default function App() {
       const result = await response.json();
       if (result.success) {
         processRawData(result.data);
+        if (result.seniorityData) {
+          setSeniorityData(result.seniorityData);
+        }
         setFtpStatus('success');
       } else {
         setError(result.error);
@@ -257,7 +264,7 @@ export default function App() {
             onClick={() => setActivePage('dashboard')}
             className={cn(
               "w-full flex items-center px-3 py-2 rounded-lg transition-colors mb-6",
-              activePage === 'dashboard' ? "bg-emerald-600 text-white" : "hover:bg-zinc-800 hover:text-zinc-200"
+              activePage === 'dashboard' ? "bg-emerald-600 text-white" : "hover:bg-zinc-800 hover:text-emerald-400"
             )}
           >
             <LayoutDashboard size={20} />
@@ -266,7 +273,7 @@ export default function App() {
 
           {isSidebarOpen && (
             <div className="px-3 mb-2 mt-6">
-              <span className="text-sm font-black text-zinc-300 uppercase tracking-[0.2em]">Schade</span>
+              <span className="text-sm font-black text-emerald-400 uppercase tracking-[0.2em]">Schade</span>
             </div>
           )}
           
@@ -301,6 +308,17 @@ export default function App() {
           >
             <Bus size={20} />
             {isSidebarOpen && <span className="ml-3 font-medium">Voertuig</span>}
+          </button>
+
+          <button
+            onClick={() => setActivePage('seniority')}
+            className={cn(
+              "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
+              activePage === 'seniority' ? "bg-emerald-600 text-white" : "hover:bg-zinc-800 hover:text-zinc-200"
+            )}
+          >
+            <Clock size={20} />
+            {isSidebarOpen && <span className="ml-3 font-medium">Anciënniteit</span>}
           </button>
         </nav>
 
@@ -849,6 +867,68 @@ export default function App() {
                               </motion.tr>
                             ))}
                           </AnimatePresence>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : activePage === 'seniority' ? (
+                <div className="space-y-8">
+                  <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
+                    <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
+                      <Clock className="text-emerald-500" size={20} />
+                      Schades per Dienstjaar
+                    </h3>
+                    <div className="h-[400px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={seniorityData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                          <XAxis 
+                            dataKey="Dienstjaren" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: '#71717a', fontSize: 12 }}
+                            label={{ value: 'Dienstjaren', position: 'insideBottom', offset: -5 }}
+                          />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: '#71717a', fontSize: 12 }}
+                          />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                            cursor={{ fill: '#f4f4f5' }}
+                          />
+                          <Bar 
+                            dataKey="schades" 
+                            fill="#10b981" 
+                            radius={[4, 4, 0, 0]} 
+                            name="Aantal Schades"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-zinc-100 bg-zinc-50/30">
+                      <h3 className="font-semibold text-zinc-900">Details Tabel</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-zinc-50/50">
+                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Dienstjaren</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Aantal Schades</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                          {seniorityData.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-zinc-50/80 transition-colors">
+                              <td className="px-6 py-4 text-sm font-medium text-zinc-900">{row.Dienstjaren}</td>
+                              <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">{row.schades}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>

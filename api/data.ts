@@ -52,16 +52,23 @@ export default async function handler(req: any, res: any) {
     const buffer = Buffer.concat(chunks);
     
     const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
-    const wsname = 'BRON';
-    const ws = wb.Sheets[wsname];
     
-    if (!ws) {
+    // Fetch BRON data
+    const wsBron = wb.Sheets['BRON'];
+    if (!wsBron) {
       throw new Error('Tabblad "BRON" niet gevonden in het Excel bestand op FTP.');
     }
+    const bronData = XLSX.utils.sheet_to_json(wsBron) as any[];
 
-    const rawData = XLSX.utils.sheet_to_json(ws) as any[];
+    // Fetch schades-dienstjaar data
+    const wsDienstjaar = wb.Sheets['schades-dienstjaar'];
+    const dienstjaarData = wsDienstjaar ? XLSX.utils.sheet_to_json(wsDienstjaar) : [];
     
-    res.status(200).json({ success: true, data: rawData });
+    res.status(200).json({ 
+      success: true, 
+      data: bronData,
+      seniorityData: dienstjaarData
+    });
   } catch (error: any) {
     console.error("Vercel API Error:", error);
     res.status(500).json({ success: false, error: error.message });
