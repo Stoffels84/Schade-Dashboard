@@ -87,7 +87,20 @@ export default function App() {
 
       return {
         personeelsnr: String(row['personeelsnr'] || row['Personeelsnr'] || row['ID'] || row['stamnr'] || '').trim(),
-        naam: String(row['Naam'] || row['naam'] || row['Chauffeur'] || row['Bestuurder'] || row['bestuurder'] || row['Volledige Naam'] || row['TEAMCOACH'] || row['Teamcoach'] || 'Onbekend').trim(),
+        naam: String(
+          row['Volledige Naam'] || 
+          row['volledige naam'] || 
+          row['Volledige naam'] || 
+          row['VOLLEDIGE NAAM'] || 
+          row['Naam'] || 
+          row['naam'] || 
+          row['Chauffeur'] || 
+          row['Bestuurder'] || 
+          row['bestuurder'] || 
+          row['TEAMCOACH'] || 
+          row['Teamcoach'] || 
+          'Onbekend'
+        ).trim(),
         locatie: String(row['locatie'] || row['Locatie'] || row['Plaats'] || '').trim(),
         datum: (row['Datum'] || row['datum']) instanceof Date 
           ? `${String((row['Datum'] || row['datum']).getDate()).padStart(2, '0')}-${String((row['Datum'] || row['datum']).getMonth() + 1).padStart(2, '0')}-${(row['Datum'] || row['datum']).getFullYear()}`
@@ -252,8 +265,8 @@ export default function App() {
           </button>
 
           {isSidebarOpen && (
-            <div className="px-3 mb-2">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Schade</span>
+            <div className="px-3 mb-2 mt-6">
+              <span className="text-sm font-black text-zinc-300 uppercase tracking-[0.2em]">Schade</span>
             </div>
           )}
           
