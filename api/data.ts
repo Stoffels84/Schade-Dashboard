@@ -61,13 +61,37 @@ export default async function handler(req: any, res: any) {
     const bronData = XLSX.utils.sheet_to_json(wsBron) as any[];
 
     // Fetch schades-dienstjaar data
-    const wsDienstjaar = wb.Sheets['schades-dienstjaar'];
-    const dienstjaarData = wsDienstjaar ? XLSX.utils.sheet_to_json(wsDienstjaar) : [];
+    const sheetNames = wb.SheetNames;
+    const seniorityTabName = sheetNames.find(name => 
+      name.toLowerCase().replace(/\s/g, '') === 'schades-dienstjaar' || 
+      name.toLowerCase().replace(/\s/g, '') === 'schadesdienstjaar'
+    );
     
+    let seniorityData: any[] = [];
+    if (seniorityTabName) {
+      const wsDienstjaar = wb.Sheets[seniorityTabName];
+      const rawSeniority = XLSX.utils.sheet_to_json(wsDienstjaar) as any[];
+      
+      // Normalize keys to "Dienstjaren" and "schades"
+      seniorityData = rawSeniority.map(row => {
+        const normalized: any = {};
+        Object.keys(row).forEach(key => {
+          const lowerKey = key.toLowerCase().trim();
+          if (lowerKey === 'dienstjaren' || lowerKey === 'dienstjaar') {
+            normalized['Dienstjaren'] = row[key];
+          } else if (lowerKey === 'schades' || lowerKey === 'schade' || lowerKey === 'aantal') {
+            normalized['schades'] = row[key];
+          } else {
+            normalized[key] = row[key];
+          }
+        });
+        return normalized;
+      }).filter(row => row.Dienstjaren !== undefined);
+    }
     res.status(200).json({ 
       success: true, 
       data: bronData,
-      seniorityData: dienstjaarData
+      seniorityData: seniorityData
     });
   } catch (error: any) {
     console.error("Vercel API Error:", error);

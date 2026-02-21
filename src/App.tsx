@@ -51,6 +51,43 @@ export default function App() {
   const [data, setData] = useState<DamageRecord[]>([]);
   const [seniorityData, setSeniorityData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
+
+  const groupedSeniorityData = useMemo(() => {
+    if (!seniorityData.length) return [];
+
+    const bins: Record<string, { total: number; count: number }> = {};
+    
+    seniorityData.forEach(item => {
+      const years = parseInt(item.Dienstjaren);
+      const schades = parseFloat(item.schades);
+      if (isNaN(years) || isNaN(schades)) return;
+      
+      let label = "";
+      if (years <= 5) {
+        label = "0 tot 5";
+      } else {
+        const binIndex = Math.ceil((years - 5) / 5);
+        const start = 5 + (binIndex - 1) * 5 + 1;
+        const end = 5 + binIndex * 5;
+        label = `${start} tot ${end}`;
+      }
+      
+      if (!bins[label]) {
+        bins[label] = { total: 0, count: 0 };
+      }
+      bins[label].total += schades;
+      bins[label].count += 1;
+    });
+
+    return Object.entries(bins)
+      .map(([label, data]) => ({ 
+        label, 
+        avg: parseFloat((data.total / data.count).toFixed(2)), 
+        personCount: data.count,
+        sortKey: label === "0 tot 5" ? 0 : parseInt(label.split(' ')[0])
+      }))
+      .sort((a, b) => a.sortKey - b.sortKey);
+  }, [seniorityData]);
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -264,7 +301,7 @@ export default function App() {
             onClick={() => setActivePage('dashboard')}
             className={cn(
               "w-full flex items-center px-3 py-2 rounded-lg transition-colors mb-6",
-              activePage === 'dashboard' ? "bg-emerald-600 text-white" : "hover:bg-zinc-800 hover:text-emerald-400"
+              activePage === 'dashboard' ? "bg-emerald-600 text-white" : "text-emerald-400 hover:bg-zinc-800"
             )}
           >
             <LayoutDashboard size={20} />
@@ -877,37 +914,46 @@ export default function App() {
                   <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
                     <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
                       <Clock className="text-emerald-500" size={20} />
-                      Schades per Dienstjaar
+                      Gemiddelde Schades per Dienstjaar Bundel
                     </h3>
-                    <div className="h-[400px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={seniorityData}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                          <XAxis 
-                            dataKey="Dienstjaren" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{ fill: '#71717a', fontSize: 12 }}
-                            label={{ value: 'Dienstjaren', position: 'insideBottom', offset: -5 }}
-                          />
-                          <YAxis 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{ fill: '#71717a', fontSize: 12 }}
-                          />
-                          <Tooltip 
-                            contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                            cursor={{ fill: '#f4f4f5' }}
-                          />
-                          <Bar 
-                            dataKey="schades" 
-                            fill="#10b981" 
-                            radius={[4, 4, 0, 0]} 
-                            name="Aantal Schades"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
+                    {groupedSeniorityData.length > 0 ? (
+                      <div className="h-[400px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={groupedSeniorityData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                            <XAxis 
+                              dataKey="label" 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fill: '#71717a', fontSize: 12 }}
+                              label={{ value: 'Dienstjaren Bundels', position: 'insideBottom', offset: -5 }}
+                            />
+                            <YAxis 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fill: '#71717a', fontSize: 12 }}
+                            />
+                            <Tooltip 
+                              contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                              cursor={{ fill: '#f4f4f5' }}
+                              formatter={(value: number) => [`${value}`, 'Gemiddelde Schades']}
+                            />
+                            <Bar 
+                              dataKey="avg" 
+                              fill="#10b981" 
+                              radius={[4, 4, 0, 0]} 
+                              name="Gemiddelde Schades"
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-[400px] flex flex-col items-center justify-center text-zinc-500 bg-zinc-50 rounded-xl border border-dashed border-zinc-200">
+                        <Database size={40} className="mb-4 opacity-20" />
+                        <p>Geen data gevonden in tabblad "schades-dienstjaar"</p>
+                        <p className="text-xs mt-2">Controleer of de kolommen "Dienstjaren" en "schades" heten.</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
@@ -918,15 +964,17 @@ export default function App() {
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="bg-zinc-50/50">
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Dienstjaren</th>
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Aantal Schades</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Bundel (Dienstjaren)</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Aantal Personen</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Gemiddelde Schades</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-100">
-                          {seniorityData.map((row, idx) => (
+                          {groupedSeniorityData.map((row, idx) => (
                             <tr key={idx} className="hover:bg-zinc-50/80 transition-colors">
-                              <td className="px-6 py-4 text-sm font-medium text-zinc-900">{row.Dienstjaren}</td>
-                              <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">{row.schades}</td>
+                              <td className="px-6 py-4 text-sm font-medium text-zinc-900">{row.label}</td>
+                              <td className="px-6 py-4 text-sm text-right text-zinc-600">{row.personCount}</td>
+                              <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">{row.avg}</td>
                             </tr>
                           ))}
                         </tbody>
