@@ -114,12 +114,11 @@ export default function App() {
         processRawData(result.data);
         setFtpStatus('success');
       } else {
-        // Don't show error if FTP is just not configured yet
-        if (!result.error.includes("Configuratie ontbreekt")) {
-          setError(result.error);
-          setFtpStatus('error');
-        } else {
+        setError(result.error);
+        if (result.error.includes("Configuratie ontbreekt")) {
           setFtpStatus('idle');
+        } else {
+          setFtpStatus('error');
         }
       }
     } catch (err) {
@@ -323,7 +322,7 @@ export default function App() {
                   {ftpStatus === 'success' ? "FTP Verbonden" :
                    ftpStatus === 'error' ? "FTP Fout" :
                    ftpStatus === 'loading' ? "Laden..." :
-                   "Geen FTP Config"}
+                   error ? "Config Fout" : "Geen FTP Config"}
                 </span>
               </div>
             </div>

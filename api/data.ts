@@ -22,9 +22,14 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!host || !user || !password) {
+      const missing = [];
+      if (!host) missing.push("FTP_HOST");
+      if (!user) missing.push("FTP_USER");
+      if (!password) missing.push("FTP_PASSWORD");
+      
       return res.status(500).json({ 
         success: false, 
-        error: `Configuratie ontbreekt op Vercel. Controleer de Environment Variables.` 
+        error: `Vercel Configuratie Fout: De volgende variabelen ontbreken in je Vercel Dashboard: ${missing.join(", ")}. Voeg deze toe bij Settings -> Environment Variables en doe een Redeploy.` 
       });
     }
 
