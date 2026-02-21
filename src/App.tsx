@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { 
   Upload, 
@@ -18,7 +18,11 @@ import {
   X,
   LayoutDashboard,
   Trophy,
-  Menu
+  Menu,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  Database
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -50,6 +54,85 @@ export default function App() {
   const [typeSearch, setTypeSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ftpStatus, setFtpStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const processRawData = useCallback((rawData: any[]) => {
+    if (rawData.length > 0) {
+      setHeaders(Object.keys(rawData[0]));
+    }
+
+    const mappedData: DamageRecord[] = rawData.map((row: any) => {
+      const rawType = String(row['Type'] || row['type'] || '').trim();
+      let voertuigCategory = 'Overig';
+      const lowerType = rawType.toLowerCase();
+      
+      if (lowerType.includes('standaard')) voertuigCategory = 'Standaard';
+      else if (lowerType.includes('gelede')) voertuigCategory = 'Gelede';
+      else if (lowerType.includes('flexity')) voertuigCategory = 'Flexity';
+      else if (lowerType.includes('hermelijn')) voertuigCategory = 'Hermelijn';
+      else if (rawType) voertuigCategory = rawType;
+
+      const busTramMode = String(row['bus/tram'] || row['Bus/Tram'] || row['Voertuig'] || row['voertuig'] || '').trim();
+
+      const damageTypeValue = String(
+        row['Schade'] || 
+        row['schade'] || 
+        row['Soort'] || 
+        row['soort'] || 
+        row['Type Schade'] || 
+        row['Schade Type'] || 
+        row['Omschrijving'] || 
+        ''
+      ).trim();
+
+      return {
+        personeelsnr: String(row['personeelsnr'] || row['Personeelsnr'] || row['ID'] || row['stamnr'] || '').trim(),
+        naam: String(row['Naam'] || row['naam'] || row['Chauffeur'] || row['Bestuurder'] || row['bestuurder'] || row['Volledige Naam'] || row['TEAMCOACH'] || row['Teamcoach'] || 'Onbekend').trim(),
+        locatie: String(row['locatie'] || row['Locatie'] || row['Plaats'] || '').trim(),
+        datum: (row['Datum'] || row['datum']) instanceof Date 
+          ? `${String((row['Datum'] || row['datum']).getDate()).padStart(2, '0')}-${String((row['Datum'] || row['datum']).getMonth() + 1).padStart(2, '0')}-${(row['Datum'] || row['datum']).getFullYear()}`
+          : String(row['Datum'] || row['datum'] || ''),
+        link: String(row['link'] || row['Link'] || '').trim(),
+        type: voertuigCategory,
+        damageType: damageTypeValue || 'Onbekend',
+        bus_tram: busTramMode || 'Onbekend',
+        rawData: row,
+      };
+    }).filter(r => r.personeelsnr);
+
+    setData(mappedData);
+  }, []);
+
+  const fetchFTPData = useCallback(async () => {
+    setIsLoading(true);
+    setFtpStatus('loading');
+    setError(null);
+    try {
+      const response = await fetch('/api/data');
+      const result = await response.json();
+      if (result.success) {
+        processRawData(result.data);
+        setFtpStatus('success');
+      } else {
+        // Don't show error if FTP is just not configured yet
+        if (!result.error.includes("Configuratie ontbreekt")) {
+          setError(result.error);
+          setFtpStatus('error');
+        } else {
+          setFtpStatus('idle');
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch FTP data:", err);
+      setFtpStatus('error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [processRawData]);
+
+  useEffect(() => {
+    fetchFTPData();
+  }, [fetchFTPData]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -72,57 +155,7 @@ export default function App() {
         }
 
         const rawData = XLSX.utils.sheet_to_json(ws) as any[];
-        
-        // Extract headers from the first row or the sheet range
-        if (rawData.length > 0) {
-          setHeaders(Object.keys(rawData[0]));
-        }
-
-        // Map Excel columns to our interface with more robust fallbacks
-        const mappedData: DamageRecord[] = rawData.map((row: any) => {
-          // The 'Type' column contains the vehicle category (Standaard, Gelede, Flexity, Hermelijn)
-          const rawType = String(row['Type'] || row['type'] || '').trim();
-          
-          let voertuigCategory = 'Overig';
-          const lowerType = rawType.toLowerCase();
-          
-          if (lowerType.includes('standaard')) voertuigCategory = 'Standaard';
-          else if (lowerType.includes('gelede')) voertuigCategory = 'Gelede';
-          else if (lowerType.includes('flexity')) voertuigCategory = 'Flexity';
-          else if (lowerType.includes('hermelijn')) voertuigCategory = 'Hermelijn';
-          else if (rawType) voertuigCategory = rawType;
-
-          // Bus/Tram mode
-          const busTramMode = String(row['bus/tram'] || row['Bus/Tram'] || row['Voertuig'] || row['voertuig'] || '').trim();
-
-          // Damage type (Type schade)
-          const damageTypeValue = String(
-            row['Schade'] || 
-            row['schade'] || 
-            row['Soort'] || 
-            row['soort'] || 
-            row['Type Schade'] || 
-            row['Schade Type'] || 
-            row['Omschrijving'] || 
-            ''
-          ).trim();
-
-          return {
-            personeelsnr: String(row['personeelsnr'] || row['Personeelsnr'] || row['ID'] || row['stamnr'] || '').trim(),
-            naam: String(row['Naam'] || row['naam'] || row['Chauffeur'] || row['Bestuurder'] || row['bestuurder'] || row['Volledige Naam'] || row['TEAMCOACH'] || row['Teamcoach'] || 'Onbekend').trim(),
-            locatie: String(row['locatie'] || row['Locatie'] || row['Plaats'] || '').trim(),
-            datum: (row['Datum'] || row['datum']) instanceof Date 
-              ? `${String((row['Datum'] || row['datum']).getDate()).padStart(2, '0')}-${String((row['Datum'] || row['datum']).getMonth() + 1).padStart(2, '0')}-${(row['Datum'] || row['datum']).getFullYear()}`
-              : String(row['Datum'] || row['datum'] || ''),
-            link: String(row['link'] || row['Link'] || '').trim(),
-            type: voertuigCategory,
-            damageType: damageTypeValue || 'Onbekend',
-            bus_tram: busTramMode || 'Onbekend',
-            rawData: row,
-          };
-        }).filter(r => r.personeelsnr);
-
-        setData(mappedData);
+        processRawData(rawData);
       } catch (err: any) {
         setError(err.message || 'Fout bij het inlezen van het bestand.');
       } finally {
@@ -207,17 +240,23 @@ export default function App() {
           )}
         </div>
 
-        <nav className="flex-1 py-6 px-3 space-y-2">
+        <nav className="flex-1 py-6 px-3 space-y-1">
           <button
             onClick={() => setActivePage('dashboard')}
             className={cn(
-              "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
+              "w-full flex items-center px-3 py-2 rounded-lg transition-colors mb-6",
               activePage === 'dashboard' ? "bg-emerald-600 text-white" : "hover:bg-zinc-800 hover:text-zinc-200"
             )}
           >
             <LayoutDashboard size={20} />
             {isSidebarOpen && <span className="ml-3 font-medium">Dashboard</span>}
           </button>
+
+          {isSidebarOpen && (
+            <div className="px-3 mb-2">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Schade</span>
+            </div>
+          )}
           
           <button
             onClick={() => setActivePage('topcrashers')}
@@ -254,19 +293,41 @@ export default function App() {
         </nav>
 
         <div className="p-4 border-t border-zinc-800">
-          <label className={cn(
-            "cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-zinc-200 w-full py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm border border-zinc-700",
-            !isSidebarOpen && "px-0"
-          )}>
-            <Upload size={18} />
-            {isSidebarOpen && <span>Excel Uploaden</span>}
-            <input 
-              type="file" 
-              className="hidden" 
-              accept=".xlsm,.xlsx" 
-              onChange={handleFileUpload} 
-            />
-          </label>
+          {isSidebarOpen && (
+            <div className="mt-4 pt-4 border-t border-zinc-800/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">FTP Status</span>
+                <button 
+                  onClick={fetchFTPData}
+                  disabled={isLoading}
+                  className="text-zinc-500 hover:text-emerald-500 transition-colors"
+                  title="Ververs FTP data"
+                >
+                  <RefreshCw size={12} className={cn(isLoading && "animate-spin")} />
+                </button>
+              </div>
+              
+              <div className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border",
+                ftpStatus === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
+                ftpStatus === 'error' ? "bg-red-500/10 border-red-500/20 text-red-400" :
+                ftpStatus === 'loading' ? "bg-blue-500/10 border-blue-500/20 text-blue-400" :
+                "bg-zinc-800/50 border-zinc-700/50 text-zinc-500"
+              )}>
+                {ftpStatus === 'success' ? <CheckCircle2 size={14} /> :
+                 ftpStatus === 'error' ? <XCircle size={14} /> :
+                 ftpStatus === 'loading' ? <RefreshCw size={14} className="animate-spin" /> :
+                 <Database size={14} />}
+                
+                <span className="truncate">
+                  {ftpStatus === 'success' ? "FTP Verbonden" :
+                   ftpStatus === 'error' ? "FTP Fout" :
+                   ftpStatus === 'loading' ? "Laden..." :
+                   "Geen FTP Config"}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
