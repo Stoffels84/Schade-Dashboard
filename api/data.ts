@@ -152,6 +152,32 @@ export default async function handler(req: any, res: any) {
       fileStatuses["toegestaan_gebruik.xlsx"] = { status: 'not_found', message: e.message };
     }
 
+    // Fetch Overzicht gesprekken (aangepast).xlsx
+    let conversationsData: any[] = [];
+    try {
+      const convChunks: any[] = [];
+      const convWritableStream = new Stream.Writable({
+        write(chunk, encoding, next) { convChunks.push(chunk); next(); }
+      });
+      const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '';
+      const convFile = "Overzicht gesprekken (aangepast).xlsx";
+      // Try both .xlsx and .xslx just in case
+      try {
+        await client.downloadTo(convWritableStream, `${dir}${convFile}`);
+      } catch (e) {
+        await client.downloadTo(convWritableStream, `${dir}Overzicht gesprekken (aangepast).xslx`);
+      }
+      const convBuffer = Buffer.concat(convChunks);
+      const convWb = XLSX.read(convBuffer, { type: 'buffer', cellDates: true });
+      const wsConv = convWb.Sheets[convWb.SheetNames[0]];
+      if (wsConv) {
+        conversationsData = XLSX.utils.sheet_to_json(wsConv);
+      }
+      fileStatuses[convFile] = { status: 'success' };
+    } catch (e: any) {
+      fileStatuses["Overzicht gesprekken (aangepast).xlsx"] = { status: 'not_found', message: e.message };
+    }
+
     res.status(200).json({ 
       success: true, 
       data: bronData,
@@ -159,6 +185,7 @@ export default async function handler(req: any, res: any) {
       personnelData: personnelData,
       coachingData: coachingData,
       allowedUsers: allowedUsers,
+      conversationsData: conversationsData,
       fileStatuses: fileStatuses
     });
   } catch (error: any) {
