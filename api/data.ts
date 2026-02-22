@@ -130,12 +130,41 @@ export default async function handler(req: any, res: any) {
       personnelStatus = `error: ${e.message}`;
     }
 
+    // Fetch Coachingslijst.xlsx
+    let coachingData = { requested: [], completed: [] };
+    try {
+      const coachingChunks: any[] = [];
+      const coachingWritableStream = new Stream.Writable({
+        write(chunk, encoding, next) {
+          coachingChunks.push(chunk);
+          next();
+        }
+      });
+      const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '';
+      await client.downloadTo(coachingWritableStream, `${dir}Coachingslijst.xlsx`);
+      const coachingBuffer = Buffer.concat(coachingChunks);
+      const coachingWb = XLSX.read(coachingBuffer, { type: 'buffer', cellDates: true });
+      
+      const wsRequested = coachingWb.Sheets['Coaching'];
+      if (wsRequested) {
+        coachingData.requested = XLSX.utils.sheet_to_json(wsRequested);
+      }
+      
+      const wsCompleted = coachingWb.Sheets['Voltooide coachings'];
+      if (wsCompleted) {
+        coachingData.completed = XLSX.utils.sheet_to_json(wsCompleted);
+      }
+    } catch (e) {
+      console.warn("Could not fetch Coachingslijst.xlsx:", e);
+    }
+
     res.status(200).json({ 
       success: true, 
       data: bronData,
       seniorityData: seniorityData,
       personnelData: personnelData,
-      personnelStatus: personnelStatus
+      personnelStatus: personnelStatus,
+      coachingData: coachingData
     });
   } catch (error: any) {
     console.error("Vercel API Error:", error);

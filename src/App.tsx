@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import { 
   Upload, 
   Search, 
+  Filter,
   Bus, 
   MapPin, 
   Calendar, 
@@ -45,12 +46,23 @@ import { cn } from './lib/utils';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+const EXCLUDED_HEADERS = [
+  'personeelsnr', 'Personeelsnr', 'ID', 'stamnr',
+  'Naam', 'naam', 'Chauffeur', 'Bestuurder', 'Volledige Naam',
+  'datum', 'Datum',
+  'bus/tram', 'Bus/Tram', 'Voertuig', 'voertuig',
+  'Type', 'type',
+  'link', 'Link',
+  'TEAMCOACH', 'Teamcoach', 'teamcoach'
+].map(h => h.toLowerCase().trim());
+
 export default function App() {
   const [activePage, setActivePage] = useState<'dashboard' | 'topcrashers' | 'locatie' | 'voertuig' | 'seniority'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [data, setData] = useState<DamageRecord[]>([]);
   const [seniorityData, setSeniorityData] = useState<any[]>([]);
   const [personnelInfo, setPersonnelInfo] = useState<any>(null);
+  const [coachingData, setCoachingData] = useState<{ requested: any[], completed: any[] }>({ requested: [], completed: [] });
   const [personnelStatus, setPersonnelStatus] = useState<string>('idle');
   const [headers, setHeaders] = useState<string[]>([]);
 
@@ -177,6 +189,9 @@ export default function App() {
         if (result.personnelStatus) {
           setPersonnelStatus(result.personnelStatus);
         }
+        if (result.coachingData) {
+          setCoachingData(result.coachingData);
+        }
         setFtpStatus('success');
       } else {
         setError(result.error);
@@ -290,16 +305,28 @@ export default function App() {
     const locationCount: Record<string, number> = {};
 
     targetData.forEach(item => {
-      typeCount[item.damageType] = (typeCount[item.damageType] || 0) + 1;
-      vehicleCount[item.type] = (vehicleCount[item.type] || 0) + 1;
-      locationCount[item.locatie] = (locationCount[item.locatie] || 0) + 1;
+      const dType = item.damageType || 'Onbekend';
+      const vType = item.type || 'Onbekend';
+      const loc = item.locatie || 'Onbekend';
+      
+      typeCount[dType] = (typeCount[dType] || 0) + 1;
+      vehicleCount[vType] = (vehicleCount[vType] || 0) + 1;
+      locationCount[loc] = (locationCount[loc] || 0) + 1;
     });
 
     return {
       totalIncidents: targetData.length,
-      byType: Object.entries(typeCount).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 5),
-      byVehicle: Object.entries(vehicleCount).map(([name, value]) => ({ name, value })),
-      byLocation: Object.entries(locationCount).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 5),
+      byType: Object.entries(typeCount)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10),
+      byVehicle: Object.entries(vehicleCount)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value),
+      byLocation: Object.entries(locationCount)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10),
     };
   }, [filteredData]);
 
@@ -311,7 +338,9 @@ export default function App() {
     // Try to find the person in the JSON data
     if (Array.isArray(personnelInfo)) {
       return personnelInfo.find(p => {
+        // Check specific known keys first
         const id = String(
+          p.PersoneelsNr ||
           p.personeelsnr || 
           p.Personeelsnr || 
           p.ID || 
@@ -319,27 +348,38 @@ export default function App() {
           p.Stamnummer || 
           p.stamnummer || 
           p['Personeels Nr'] ||
+          p['PersoneelsNr'] ||
           ''
         ).toLowerCase().trim();
         
-        // Match exact or with/without leading zeros
-        return id === q || 
-               id.replace(/^0+/, '') === q.replace(/^0+/, '') ||
-               (id.length > 0 && q.length > 0 && (id.includes(q) || q.includes(id)));
+        if (id === q || (id.length > 0 && id.replace(/^0+/, '') === q.replace(/^0+/, ''))) return true;
+
+        // Fallback: check any key that looks like an ID key
+        return Object.entries(p).some(([key, val]) => {
+          const k = key.toLowerCase();
+          if (k.includes('personeels') || k.includes('stamnr') || k.includes('id') || k.includes('nummer')) {
+            const v = String(val).toLowerCase().trim();
+            return v === q || (v.length > 0 && v.replace(/^0+/, '') === q.replace(/^0+/, ''));
+          }
+          return false;
+        });
       });
     } else {
       // If it's an object, check if the searchQuery is a key
       const keys = Object.keys(personnelInfo);
       const matchingKey = keys.find(k => {
         const normalizedK = k.toLowerCase().trim();
-        return normalizedK === q || normalizedK.replace(/^0+/, '') === q.replace(/^0+/, '');
+        return normalizedK === q || (normalizedK.length > 0 && normalizedK.replace(/^0+/, '') === q.replace(/^0+/, ''));
       });
       if (matchingKey) return personnelInfo[matchingKey];
 
       // Or search through values
       return Object.values(personnelInfo).find((p: any) => {
         if (typeof p !== 'object' || p === null) return false;
+        
+        // Check specific known keys first
         const id = String(
+          p.PersoneelsNr ||
           p.personeelsnr || 
           p.Personeelsnr || 
           p.ID || 
@@ -347,12 +387,39 @@ export default function App() {
           p.Stamnummer || 
           p.stamnummer || 
           p['Personeels Nr'] ||
+          p['PersoneelsNr'] ||
           ''
         ).toLowerCase().trim();
-        return id === q || id.replace(/^0+/, '') === q.replace(/^0+/, '');
+        
+        if (id === q || (id.length > 0 && id.replace(/^0+/, '') === q.replace(/^0+/, ''))) return true;
+
+        // Fallback: check any key that looks like an ID key
+        return Object.entries(p).some(([key, val]) => {
+          const k = key.toLowerCase();
+          if (k.includes('personeels') || k.includes('stamnr') || k.includes('id') || k.includes('nummer')) {
+            const v = String(val).toLowerCase().trim();
+            return v === q || (v.length > 0 && v.replace(/^0+/, '') === q.replace(/^0+/, ''));
+          }
+          return false;
+        });
       });
     }
   }, [searchQuery, personnelInfo]);
+
+  const filteredCoaching = useMemo(() => {
+    if (!searchQuery) return { requested: [], completed: [] };
+    const q = searchQuery.toLowerCase().trim();
+    
+    const filterFn = (item: any) => {
+      const pNr = String(item['P-nr'] || item['p-nr'] || item['Personeelsnr'] || item['PersoneelsNr'] || '').toLowerCase().trim();
+      return pNr === q || (pNr.length > 0 && pNr.replace(/^0+/, '') === q.replace(/^0+/, ''));
+    };
+
+    return {
+      requested: coachingData.requested.filter(filterFn),
+      completed: coachingData.completed.filter(filterFn)
+    };
+  }, [searchQuery, coachingData]);
 
   return (
     <div className="min-h-screen bg-zinc-50 flex">
@@ -364,7 +431,10 @@ export default function App() {
         <div className="h-16 flex items-center px-6 border-b border-zinc-800">
           <Bus className="text-emerald-500 w-6 h-6 flex-shrink-0" />
           {isSidebarOpen && (
-            <span className="ml-3 text-white font-bold tracking-tight whitespace-nowrap">Schade Tracker</span>
+            <div className="ml-3 flex flex-col">
+              <span className="text-white font-bold tracking-tight whitespace-nowrap leading-tight">OT Gent</span>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold">analyse en rapportering</span>
+            </div>
           )}
         </div>
 
@@ -617,6 +687,19 @@ export default function App() {
 
               {activePage === 'dashboard' ? (
                 <div className="space-y-8">
+                  {/* Summary Stats Title */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-bold text-zinc-900">Dashboard Overzicht</h2>
+                      {(searchQuery || startDate || endDate || vehicleSearch || typeSearch) && (
+                        <span className="flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase rounded-md animate-pulse">
+                          <Filter size={10} />
+                          Filters Actief
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Personnel Info Card */}
                   {searchQuery && (
                     <div className="space-y-4">
@@ -658,7 +741,8 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Summary Stats */}
+                  {/* Summary Stats Title - MOVED TO TOP */}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
                       <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Totaal Schades</p>
@@ -685,37 +769,39 @@ export default function App() {
                   </div>
 
                   {/* Dashboard Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-6">
                     {/* Damage Type Chart */}
-                    <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
-                      <div className="flex items-center gap-2 mb-6">
-                        <AlertCircle size={18} className="text-emerald-600" />
-                        <h3 className="font-semibold text-zinc-900">Top 5 Schade Types</h3>
+                    {!searchQuery && (
+                      <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
+                        <div className="flex items-center gap-2 mb-6">
+                          <AlertCircle size={18} className="text-emerald-600" />
+                          <h3 className="font-semibold text-zinc-900">Top 5 Schade Types</h3>
+                        </div>
+                        <div className="h-[300px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.byType} layout="vertical" margin={{ left: 40 }}>
+                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+                              <XAxis type="number" hide />
+                              <YAxis 
+                                dataKey="name" 
+                                type="category" 
+                                width={120} 
+                                tick={{ fontSize: 11, fill: '#71717a' }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <Tooltip 
+                                cursor={{ fill: '#f8fafc' }}
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                              />
+                              <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={stats.byType} layout="vertical" margin={{ left: 40 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                            <XAxis type="number" hide />
-                            <YAxis 
-                              dataKey="name" 
-                              type="category" 
-                              width={120} 
-                              tick={{ fontSize: 11, fill: '#71717a' }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <Tooltip 
-                              cursor={{ fill: '#f8fafc' }}
-                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                            />
-                            <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
+                    )}
 
-                    {/* Location Chart */}
+                    {/* Location Chart - Full Width */}
                     <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
                       <div className="flex items-center gap-2 mb-6">
                         <MapPin size={18} className="text-emerald-600" />
@@ -817,6 +903,80 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Coaching Section */}
+                  {searchQuery && (filteredCoaching.requested.length > 0 || filteredCoaching.completed.length > 0) && (
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2 px-2">
+                        <CheckCircle2 className="text-emerald-600" size={24} />
+                        <h2 className="text-xl font-bold text-zinc-900">Coaching</h2>
+                      </div>
+
+                      {/* Requested Coaching */}
+                      {filteredCoaching.requested.length > 0 && (
+                        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+                          <div className="px-6 py-4 border-b border-zinc-100 bg-zinc-50/30">
+                            <h3 className="font-semibold text-zinc-900">Aangevraagde coaching</h3>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-zinc-50/50">
+                                  <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">P-nr</th>
+                                  <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Volledige naam</th>
+                                  <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Opmerkingen</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-100">
+                                {filteredCoaching.requested.map((item, idx) => (
+                                  <tr key={idx} className="hover:bg-zinc-50/80 transition-colors">
+                                    <td className="px-6 py-4 text-sm text-zinc-900">{item['P-nr'] || item['p-nr'] || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{item['Volledige naam'] || item['volledige naam'] || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{item['Opmerkingen'] || item['opmerkingen'] || '-'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Completed Coaching */}
+                      {filteredCoaching.completed.length > 0 && (
+                        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+                          <div className="px-6 py-4 border-b border-zinc-100 bg-zinc-50/30">
+                            <h3 className="font-semibold text-zinc-900">Voltooide coachings</h3>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-zinc-50/50">
+                                  <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">P-nr</th>
+                                  <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Volledige naam</th>
+                                  <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Datum coaching</th>
+                                  <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Opmerking</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-100">
+                                {filteredCoaching.completed.map((item, idx) => (
+                                  <tr key={idx} className="hover:bg-zinc-50/80 transition-colors">
+                                    <td className="px-6 py-4 text-sm text-zinc-900">{item['P-nr'] || item['p-nr'] || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{item['Volledige naam'] || item['volledige naam'] || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">
+                                      {item['Datum coaching'] instanceof Date 
+                                        ? item['Datum coaching'].toLocaleDateString('nl-BE')
+                                        : String(item['Datum coaching'] || '-')}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{item['Opmerking'] || item['opmerking'] || '-'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Detailed Table (Visible when searching on Dashboard) */}
                   {searchQuery && (
                     <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
@@ -839,14 +999,7 @@ export default function App() {
                               <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Type</th>
                               <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Link</th>
                               {headers
-                                .filter(h => ![
-                                  'personeelsnr', 'Personeelsnr', 'ID', 'stamnr',
-                                  'Naam', 'naam', 'Chauffeur', 'Bestuurder', 'Volledige Naam',
-                                  'datum', 'Datum',
-                                  'bus/tram', 'Bus/Tram', 'Voertuig', 'voertuig',
-                                  'Type', 'type',
-                                  'link', 'Link'
-                                ].includes(h))
+                                .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
                                 .map(header => (
                                   <th key={header} className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
                                     {header}
@@ -886,14 +1039,7 @@ export default function App() {
                                     )}
                                   </td>
                                   {headers
-                                    .filter(h => ![
-                                      'personeelsnr', 'Personeelsnr', 'ID', 'stamnr',
-                                      'Naam', 'naam', 'Chauffeur', 'Bestuurder', 'Volledige Naam',
-                                      'datum', 'Datum',
-                                      'bus/tram', 'Bus/Tram', 'Voertuig', 'voertuig',
-                                      'Type', 'type',
-                                      'link', 'Link'
-                                    ].includes(h))
+                                    .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
                                     .map(header => (
                                       <td key={header} className="px-6 py-4 text-sm text-zinc-600 whitespace-nowrap">
                                         {String(record.rawData[header] || '-')}
@@ -940,14 +1086,7 @@ export default function App() {
                               <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Type</th>
                               <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Link</th>
                               {headers
-                                .filter(h => ![
-                                  'personeelsnr', 'Personeelsnr', 'ID', 'stamnr',
-                                  'Naam', 'naam', 'Chauffeur', 'Bestuurder', 'Volledige Naam',
-                                  'datum', 'Datum',
-                                  'bus/tram', 'Bus/Tram', 'Voertuig', 'voertuig',
-                                  'Type', 'type',
-                                  'link', 'Link'
-                                ].includes(h))
+                                .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
                                 .map(header => (
                                   <th key={header} className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
                                     {header}
@@ -987,14 +1126,7 @@ export default function App() {
                                     )}
                                   </td>
                                   {headers
-                                    .filter(h => ![
-                                      'personeelsnr', 'Personeelsnr', 'ID', 'stamnr',
-                                      'Naam', 'naam', 'Chauffeur', 'Bestuurder', 'Volledige Naam',
-                                      'datum', 'Datum',
-                                      'bus/tram', 'Bus/Tram', 'Voertuig', 'voertuig',
-                                      'Type', 'type',
-                                      'link', 'Link'
-                                    ].includes(h))
+                                    .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
                                     .map(header => (
                                       <td key={header} className="px-6 py-4 text-sm text-zinc-600 whitespace-nowrap">
                                         {String(record.rawData[header] || '-')}
