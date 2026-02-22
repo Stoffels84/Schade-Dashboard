@@ -48,86 +48,63 @@ export default async function handler(req: any, res: any) {
       }
     });
 
-    await client.downloadTo(writableStream, path);
-    const buffer = Buffer.concat(chunks);
-    
-    const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
-    
-    // Fetch BRON data
-    const wsBron = wb.Sheets['BRON'];
-    if (!wsBron) {
-      throw new Error('Tabblad "BRON" niet gevonden in het Excel bestand op FTP.');
-    }
-    const bronData = XLSX.utils.sheet_to_json(wsBron) as any[];
+    // Track file statuses
+    const fileStatuses: Record<string, { status: 'success' | 'error' | 'not_found', message?: string }> = {};
 
-    // Fetch schades-dienstjaar data
-    const sheetNames = wb.SheetNames;
-    const seniorityTabName = sheetNames.find(name => 
-      name.toLowerCase().replace(/\s/g, '') === 'schades-dienstjaar' || 
-      name.toLowerCase().replace(/\s/g, '') === 'schadesdienstjaar'
-    );
-    
+    // Fetch BRON data (Main file)
+    let bronData: any[] = [];
     let seniorityData: any[] = [];
-    if (seniorityTabName) {
-      const wsDienstjaar = wb.Sheets[seniorityTabName];
-      const rawSeniority = XLSX.utils.sheet_to_json(wsDienstjaar) as any[];
+    try {
+      await client.downloadTo(writableStream, path);
+      const buffer = Buffer.concat(chunks);
+      const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
       
-      // Normalize keys to "Dienstjaren" and "schades"
-      seniorityData = rawSeniority.map(row => {
-        const normalized: any = {};
-        Object.keys(row).forEach(key => {
-          const lowerKey = key.toLowerCase().trim();
-          if (lowerKey === 'dienstjaren' || lowerKey === 'dienstjaar') {
-            normalized['Dienstjaren'] = row[key];
-          } else if (lowerKey === 'schades' || lowerKey === 'schade' || lowerKey === 'aantal') {
-            normalized['schades'] = row[key];
-          } else {
-            normalized[key] = row[key];
-          }
-        });
-        return normalized;
-      }).filter(row => row.Dienstjaren !== undefined);
+      const wsBron = wb.Sheets['BRON'];
+      if (!wsBron) {
+        throw new Error('Tabblad "BRON" niet gevonden');
+      }
+      bronData = XLSX.utils.sheet_to_json(wsBron) as any[];
+
+      const sheetNames = wb.SheetNames;
+      const seniorityTabName = sheetNames.find(name => 
+        name.toLowerCase().replace(/\s/g, '') === 'schades-dienstjaar' || 
+        name.toLowerCase().replace(/\s/g, '') === 'schadesdienstjaar'
+      );
+      
+      if (seniorityTabName) {
+        const wsDienstjaar = wb.Sheets[seniorityTabName];
+        const rawSeniority = XLSX.utils.sheet_to_json(wsDienstjaar) as any[];
+        seniorityData = rawSeniority.map(row => {
+          const normalized: any = {};
+          Object.keys(row).forEach(key => {
+            const lowerKey = key.toLowerCase().trim();
+            if (lowerKey === 'dienstjaren' || lowerKey === 'dienstjaar') normalized['Dienstjaren'] = row[key];
+            else if (lowerKey === 'schades' || lowerKey === 'schade' || lowerKey === 'aantal') normalized['schades'] = row[key];
+            else normalized[key] = row[key];
+          });
+          return normalized;
+        }).filter(row => row.Dienstjaren !== undefined);
+      }
+      fileStatuses[path] = { status: 'success' };
+    } catch (e: any) {
+      fileStatuses[path] = { status: 'error', message: e.message };
     }
+
     // Fetch personeelsficheGB.json
     let personnelData = null;
-    let personnelStatus = "not_found";
     try {
       const jsonChunks: any[] = [];
       const jsonWritableStream = new Stream.Writable({
-        write(chunk, encoding, next) {
-          jsonChunks.push(chunk);
-          next();
-        }
+        write(chunk, encoding, next) { jsonChunks.push(chunk); next(); }
       });
-      
-      // Try multiple path variations
       const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '';
       const fileName = "personeelsficheGB.json";
-      const possiblePaths = [
-        `${dir}${fileName}`,
-        fileName,
-        `/${fileName}`
-      ];
-
-      let success = false;
-      for (const p of possiblePaths) {
-        try {
-          await client.downloadTo(jsonWritableStream, p);
-          success = true;
-          break;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (success) {
-        const jsonBuffer = Buffer.concat(jsonChunks);
-        personnelData = JSON.parse(jsonBuffer.toString());
-        personnelStatus = "success";
-      }
+      await client.downloadTo(jsonWritableStream, `${dir}${fileName}`);
+      const jsonBuffer = Buffer.concat(jsonChunks);
+      personnelData = JSON.parse(jsonBuffer.toString());
+      fileStatuses[fileName] = { status: 'success' };
     } catch (e: any) {
-      console.warn("Could not fetch personeelsficheGB.json:", e);
-      personnelStatus = `error: ${e.message}`;
+      fileStatuses["personeelsficheGB.json"] = { status: 'not_found', message: e.message };
     }
 
     // Fetch Coachingslijst.xlsx
@@ -135,27 +112,44 @@ export default async function handler(req: any, res: any) {
     try {
       const coachingChunks: any[] = [];
       const coachingWritableStream = new Stream.Writable({
-        write(chunk, encoding, next) {
-          coachingChunks.push(chunk);
-          next();
-        }
+        write(chunk, encoding, next) { coachingChunks.push(chunk); next(); }
       });
       const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '';
-      await client.downloadTo(coachingWritableStream, `${dir}Coachingslijst.xlsx`);
+      const coachingFile = "Coachingslijst.xlsx";
+      await client.downloadTo(coachingWritableStream, `${dir}${coachingFile}`);
       const coachingBuffer = Buffer.concat(coachingChunks);
       const coachingWb = XLSX.read(coachingBuffer, { type: 'buffer', cellDates: true });
       
       const wsRequested = coachingWb.Sheets['Coaching'];
-      if (wsRequested) {
-        coachingData.requested = XLSX.utils.sheet_to_json(wsRequested);
-      }
+      if (wsRequested) coachingData.requested = XLSX.utils.sheet_to_json(wsRequested);
       
       const wsCompleted = coachingWb.Sheets['Voltooide coachings'];
-      if (wsCompleted) {
-        coachingData.completed = XLSX.utils.sheet_to_json(wsCompleted);
+      if (wsCompleted) coachingData.completed = XLSX.utils.sheet_to_json(wsCompleted);
+      
+      fileStatuses[coachingFile] = { status: 'success' };
+    } catch (e: any) {
+      fileStatuses["Coachingslijst.xlsx"] = { status: 'not_found', message: e.message };
+    }
+
+    // Fetch toegestaan_gebruik.xlsx
+    let allowedUsers: any[] = [];
+    try {
+      const authChunks: any[] = [];
+      const authWritableStream = new Stream.Writable({
+        write(chunk, encoding, next) { authChunks.push(chunk); next(); }
+      });
+      const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '';
+      const authFile = "toegestaan_gebruik.xlsx";
+      await client.downloadTo(authWritableStream, `${dir}${authFile}`);
+      const authBuffer = Buffer.concat(authChunks);
+      const authWb = XLSX.read(authBuffer, { type: 'buffer', cellDates: true });
+      const wsAuth = authWb.Sheets[authWb.SheetNames[0]];
+      if (wsAuth) {
+        allowedUsers = XLSX.utils.sheet_to_json(wsAuth);
       }
-    } catch (e) {
-      console.warn("Could not fetch Coachingslijst.xlsx:", e);
+      fileStatuses[authFile] = { status: 'success' };
+    } catch (e: any) {
+      fileStatuses["toegestaan_gebruik.xlsx"] = { status: 'not_found', message: e.message };
     }
 
     res.status(200).json({ 
@@ -163,8 +157,9 @@ export default async function handler(req: any, res: any) {
       data: bronData,
       seniorityData: seniorityData,
       personnelData: personnelData,
-      personnelStatus: personnelStatus,
-      coachingData: coachingData
+      coachingData: coachingData,
+      allowedUsers: allowedUsers,
+      fileStatuses: fileStatuses
     });
   } catch (error: any) {
     console.error("Vercel API Error:", error);

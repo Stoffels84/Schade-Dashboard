@@ -24,7 +24,10 @@ import {
   XCircle,
   RefreshCw,
   Database,
-  Clock
+  Clock,
+  Lock,
+  User,
+  FileText
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -56,6 +59,97 @@ const EXCLUDED_HEADERS = [
   'TEAMCOACH', 'Teamcoach', 'teamcoach'
 ].map(h => h.toLowerCase().trim());
 
+function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) => void, isLoading: boolean }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading) return;
+    if (!username || !password) {
+      setError('Vul zowel gebruikersnaam als wachtwoord in.');
+      return;
+    }
+    onLogin(username, password);
+  };
+
+  return (
+    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-zinc-200 overflow-hidden"
+      >
+        <div className="bg-emerald-600 p-8 text-white text-center">
+          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Lock size={32} />
+          </div>
+          <h1 className="text-2xl font-bold">OT Gent</h1>
+          <p className="text-emerald-100 mt-1">Analyse en rapportering</p>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-zinc-700 flex items-center gap-2">
+              <User size={16} /> Gebruikersnaam
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={isLoading}
+              className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:opacity-50"
+              placeholder="Je naam"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-zinc-700 flex items-center gap-2">
+              <Lock size={16} /> Wachtwoord
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+              className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:opacity-50"
+              placeholder="••••••••"
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg flex items-center gap-2">
+              <AlertCircle size={16} /> {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isLoading ? (
+              <>
+                <RefreshCw size={18} className="animate-spin" />
+                Laden...
+              </>
+            ) : (
+              'Inloggen'
+            )}
+          </button>
+          
+          {isLoading && (
+            <p className="text-center text-xs text-zinc-400 italic">
+              Gebruikersgegevens worden geladen...
+            </p>
+          )}
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function App() {
   const [activePage, setActivePage] = useState<'dashboard' | 'topcrashers' | 'locatie' | 'voertuig' | 'seniority'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -65,6 +159,10 @@ export default function App() {
   const [coachingData, setCoachingData] = useState<{ requested: any[], completed: any[] }>({ requested: [], completed: [] });
   const [personnelStatus, setPersonnelStatus] = useState<string>('idle');
   const [headers, setHeaders] = useState<string[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [allowedUsers, setAllowedUsers] = useState<any[]>([]);
+  const [fileStatuses, setFileStatuses] = useState<Record<string, { status: 'success' | 'error' | 'not_found', message?: string }>>({});
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const groupedSeniorityData = useMemo(() => {
     if (!seniorityData.length) return [];
@@ -186,11 +284,14 @@ export default function App() {
         if (result.personnelData) {
           setPersonnelInfo(result.personnelData);
         }
-        if (result.personnelStatus) {
-          setPersonnelStatus(result.personnelStatus);
-        }
         if (result.coachingData) {
           setCoachingData(result.coachingData);
+        }
+        if (result.allowedUsers) {
+          setAllowedUsers(result.allowedUsers);
+        }
+        if (result.fileStatuses) {
+          setFileStatuses(result.fileStatuses);
         }
         setFtpStatus('success');
       } else {
@@ -421,6 +522,25 @@ export default function App() {
     };
   }, [searchQuery, coachingData]);
 
+  const handleLogin = (user: string, pass: string) => {
+    const found = allowedUsers.find(u => {
+      const uName = String(u['Naam'] || u['naam'] || '').trim();
+      const uPass = String(u['Paswoord'] || u['paswoord'] || '').trim();
+      return uName === user && uPass === pass;
+    });
+
+    if (found) {
+      setIsAuthenticated(true);
+      setLoginError(null);
+    } else {
+      alert('Ongeldige gebruikersnaam of wachtwoord.');
+    }
+  };
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} isLoading={isLoading || (ftpStatus === 'loading' && allowedUsers.length === 0)} />;
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50 flex">
       {/* Sidebar */}
@@ -540,6 +660,40 @@ export default function App() {
                    ftpStatus === 'loading' ? "Laden..." :
                    error ? "Config Fout" : "Geen FTP Config"}
                 </span>
+              </div>
+
+              {/* File Status Overview */}
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Bestanden</span>
+                </div>
+                <div className="space-y-1.5">
+                  {Object.entries(fileStatuses).length > 0 ? (
+                    Object.entries(fileStatuses).map(([fileName, info]) => {
+                      const statusInfo = info as { status: string, message?: string };
+                      return (
+                        <div key={fileName} className="flex items-center justify-between px-2 py-1.5 rounded-md bg-zinc-800/30 border border-zinc-700/30">
+                          <span className="text-[10px] text-zinc-400 truncate max-w-[100px]" title={fileName}>
+                            {fileName}
+                          </span>
+                          <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                            statusInfo.status === 'success' ? 'text-emerald-400 bg-emerald-500/10' :
+                            statusInfo.status === 'not_found' ? 'text-amber-400 bg-amber-500/10' :
+                            'text-red-400 bg-red-500/10'
+                          }`}>
+                            {statusInfo.status === 'success' ? <CheckCircle2 size={8} /> : 
+                             statusInfo.status === 'not_found' ? <AlertCircle size={8} /> : 
+                             <XCircle size={8} />}
+                            {statusInfo.status === 'success' ? 'OK' : 
+                             statusInfo.status === 'not_found' ? '?' : 'ERR'}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-[10px] text-zinc-600 italic px-2">Geen bestanden</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -979,77 +1133,83 @@ export default function App() {
 
                   {/* Detailed Table (Visible when searching on Dashboard) */}
                   {searchQuery && (
-                    <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
-                      <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/30">
-                        <h3 className="font-semibold text-zinc-900">
-                          Details voor Chauffeur: {searchQuery}
-                        </h3>
-                        <span className="text-xs text-zinc-500 font-medium bg-zinc-100 px-2 py-1 rounded-md">
-                          {filteredData.length} incidenten gevonden
-                        </span>
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2 px-2">
+                        <AlertCircle className="text-emerald-600" size={24} />
+                        <h2 className="text-xl font-bold text-zinc-900">Schade</h2>
                       </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-max">
-                          <thead>
-                            <tr className="bg-zinc-50/50">
-                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Personeelsnr</th>
-                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Volledige Naam</th>
-                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Datum</th>
-                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Bus/tram</th>
-                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Type</th>
-                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Link</th>
-                              {headers
-                                .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
-                                .map(header => (
-                                  <th key={header} className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
-                                    {header}
-                                  </th>
+                      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/30">
+                          <h3 className="font-semibold text-zinc-900">
+                            Details voor Chauffeur: {searchQuery}
+                          </h3>
+                          <span className="text-xs text-zinc-500 font-medium bg-zinc-100 px-2 py-1 rounded-md">
+                            {filteredData.length} incidenten gevonden
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse min-w-max">
+                            <thead>
+                              <tr className="bg-zinc-50/50">
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Personeelsnr</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Volledige Naam</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Datum</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Bus/tram</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Type</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Link</th>
+                                {headers
+                                  .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
+                                  .map(header => (
+                                    <th key={header} className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">
+                                      {header}
+                                    </th>
+                                  ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100">
+                              <AnimatePresence mode="popLayout">
+                                {filteredData.map((record, idx) => (
+                                  <motion.tr 
+                                    key={`${record.personeelsnr}-${idx}`}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="hover:bg-zinc-50/80 transition-colors group"
+                                  >
+                                    <td className="px-6 py-4 text-sm text-zinc-900 font-medium">{record.personeelsnr}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{record.naam}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">
+                                      {record.datum.replace(/-/g, '/')}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{record.bus_tram}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{record.type}</td>
+                                    <td className="px-6 py-4 text-sm">
+                                      {record.link && record.link !== 'undefined' ? (
+                                        <a 
+                                          href={record.link} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="text-emerald-600 hover:text-emerald-700 underline font-medium"
+                                        >
+                                          klik hier om te openen
+                                        </a>
+                                      ) : (
+                                        <span className="text-zinc-300">-</span>
+                                      )}
+                                    </td>
+                                    {headers
+                                      .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
+                                      .map(header => (
+                                        <td key={header} className="px-6 py-4 text-sm text-zinc-600 whitespace-nowrap">
+                                          {String(record.rawData[header] || '-')}
+                                        </td>
+                                      ))}
+                                  </motion.tr>
                                 ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-100">
-                            <AnimatePresence mode="popLayout">
-                              {filteredData.map((record, idx) => (
-                                <motion.tr 
-                                  key={`${record.personeelsnr}-${idx}`}
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  className="hover:bg-zinc-50/80 transition-colors group"
-                                >
-                                  <td className="px-6 py-4 text-sm text-zinc-900 font-medium">{record.personeelsnr}</td>
-                                  <td className="px-6 py-4 text-sm text-zinc-600">{record.naam}</td>
-                                  <td className="px-6 py-4 text-sm text-zinc-600">
-                                    {record.datum.replace(/-/g, '/')}
-                                  </td>
-                                  <td className="px-6 py-4 text-sm text-zinc-600">{record.bus_tram}</td>
-                                  <td className="px-6 py-4 text-sm text-zinc-600">{record.type}</td>
-                                  <td className="px-6 py-4 text-sm">
-                                    {record.link && record.link !== 'undefined' ? (
-                                      <a 
-                                        href={record.link} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-emerald-600 hover:text-emerald-700 underline font-medium"
-                                      >
-                                        klik hier om te openen
-                                      </a>
-                                    ) : (
-                                      <span className="text-zinc-300">-</span>
-                                    )}
-                                  </td>
-                                  {headers
-                                    .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
-                                    .map(header => (
-                                      <td key={header} className="px-6 py-4 text-sm text-zinc-600 whitespace-nowrap">
-                                        {String(record.rawData[header] || '-')}
-                                      </td>
-                                    ))}
-                                </motion.tr>
-                              ))}
-                            </AnimatePresence>
-                          </tbody>
-                        </table>
+                              </AnimatePresence>
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1378,14 +1538,6 @@ export default function App() {
             </div>
           )}
         </main>
-
-        <footer className="bg-white border-t border-zinc-200 py-6">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-            <p className="text-sm text-zinc-500">
-              &copy; {new Date().getFullYear()} Chauffeur Schade Dashboard. Gebruik .xlsm bestanden met "BRON" tabblad.
-            </p>
-          </div>
-        </footer>
       </div>
     </div>
   );
