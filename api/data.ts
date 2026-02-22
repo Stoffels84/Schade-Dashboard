@@ -88,10 +88,30 @@ export default async function handler(req: any, res: any) {
         return normalized;
       }).filter(row => row.Dienstjaren !== undefined);
     }
+    // Fetch personeelsficheGB.json
+    let personnelData = null;
+    try {
+      const jsonChunks: any[] = [];
+      const jsonWritableStream = new Stream.Writable({
+        write(chunk, encoding, next) {
+          jsonChunks.push(chunk);
+          next();
+        }
+      });
+      // Assuming it's in the same directory as the Excel file
+      const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '';
+      await client.downloadTo(jsonWritableStream, `${dir}personeelsficheGB.json`);
+      const jsonBuffer = Buffer.concat(jsonChunks);
+      personnelData = JSON.parse(jsonBuffer.toString());
+    } catch (e) {
+      console.warn("Could not fetch personeelsficheGB.json:", e);
+    }
+
     res.status(200).json({ 
       success: true, 
       data: bronData,
-      seniorityData: seniorityData
+      seniorityData: seniorityData,
+      personnelData: personnelData
     });
   } catch (error: any) {
     console.error("Vercel API Error:", error);

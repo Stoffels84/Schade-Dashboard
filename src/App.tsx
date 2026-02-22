@@ -50,6 +50,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [data, setData] = useState<DamageRecord[]>([]);
   const [seniorityData, setSeniorityData] = useState<any[]>([]);
+  const [personnelInfo, setPersonnelInfo] = useState<any>(null);
   const [headers, setHeaders] = useState<string[]>([]);
 
   const groupedSeniorityData = useMemo(() => {
@@ -169,6 +170,9 @@ export default function App() {
         if (result.seniorityData) {
           setSeniorityData(result.seniorityData);
         }
+        if (result.personnelData) {
+          setPersonnelInfo(result.personnelData);
+        }
         setFtpStatus('success');
       } else {
         setError(result.error);
@@ -233,20 +237,33 @@ export default function App() {
       
       let matchesDate = true;
       if (startDate || endDate) {
-        // Parse DD-MM-YYYY to Date object
-        const [day, month, year] = item.datum.split('-').map(Number);
-        const itemDate = new Date(year, month - 1, day);
+        // Parse DD-MM-YYYY or other formats to Date object
+        let itemDate: Date | null = null;
+        const parts = item.datum.split(/[-/]/).map(Number);
         
-        if (startDate) {
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
-          if (itemDate < start) matchesDate = false;
+        if (parts.length === 3) {
+          // Check if it's DD-MM-YYYY or YYYY-MM-DD
+          if (parts[0] > 1000) {
+            // YYYY-MM-DD
+            itemDate = new Date(parts[0], parts[1] - 1, parts[2]);
+          } else {
+            // DD-MM-YYYY
+            itemDate = new Date(parts[2], parts[1] - 1, parts[0]);
+          }
         }
-        
-        if (endDate) {
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          if (itemDate > end) matchesDate = false;
+
+        if (itemDate && !isNaN(itemDate.getTime())) {
+          if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            if (itemDate < start) matchesDate = false;
+          }
+          
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            if (itemDate > end) matchesDate = false;
+          }
         }
       }
 
@@ -281,6 +298,25 @@ export default function App() {
       byLocation: Object.entries(locationCount).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 5),
     };
   }, [filteredData]);
+
+  const searchedPersonnel = useMemo(() => {
+    if (!searchQuery || !personnelInfo) return null;
+    
+    // Try to find the person in the JSON data
+    // The JSON could be an array of objects or an object with IDs as keys
+    if (Array.isArray(personnelInfo)) {
+      return personnelInfo.find(p => 
+        String(p.personeelsnr || p.Personeelsnr || p.ID || p.id || '').toLowerCase() === searchQuery.toLowerCase()
+      );
+    } else {
+      // If it's an object, check if the searchQuery is a key
+      if (personnelInfo[searchQuery]) return personnelInfo[searchQuery];
+      // Or search through values
+      return Object.values(personnelInfo).find((p: any) => 
+        String(p.personeelsnr || p.Personeelsnr || p.ID || p.id || '').toLowerCase() === searchQuery.toLowerCase()
+      );
+    }
+  }, [searchQuery, personnelInfo]);
 
   return (
     <div className="min-h-screen bg-zinc-50 flex">
@@ -453,76 +489,69 @@ export default function App() {
             <div className="space-y-8 max-w-7xl mx-auto">
               {/* Common Filters */}
               <div className="flex flex-col lg:flex-row gap-4 items-end justify-between bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
-                <div className={cn(
-                  "grid gap-4 w-full",
-                  activePage === 'voertuig' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-5" : "grid-cols-1 md:grid-cols-3"
-                )}>
-                  <div className="relative">
-                    <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Zoek Chauffeur</label>
+                  <div className="grid gap-4 w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-5">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+                      <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Zoek Chauffeur</label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+                        <input
+                          type="text"
+                          placeholder="Personeelsnr..."
+                          className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Van Datum</label>
                       <input
-                        type="text"
-                        placeholder="Personeelsnr..."
-                        className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        type="date"
+                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Van Datum</label>
-                    <input
-                      type="date"
-                      className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Tot Datum</label>
+                      <input
+                        type="date"
+                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Tot Datum</label>
-                    <input
-                      type="date"
-                      className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </div>
-
-                  {activePage === 'voertuig' && (
-                    <>
+                    <div className="relative">
+                      <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Zoek Voertuig</label>
                       <div className="relative">
-                        <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Zoek Voertuig</label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-                          <input
-                            type="text"
-                            placeholder="Voertuignr..."
-                            className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                            value={vehicleSearch}
-                            onChange={(e) => setVehicleSearch(e.target.value)}
-                          />
-                        </div>
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+                        <input
+                          type="text"
+                          placeholder="Voertuignr..."
+                          className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                          value={vehicleSearch}
+                          onChange={(e) => setVehicleSearch(e.target.value)}
+                        />
                       </div>
+                    </div>
 
-                      <div>
-                        <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Filter op Type</label>
-                        <select
-                          className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none"
-                          value={typeSearch}
-                          onChange={(e) => setTypeSearch(e.target.value)}
-                        >
-                          <option value="">Alle Types</option>
-                          {uniqueTypes.map(t => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </>
-                  )}
-                </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Filter op Type</label>
+                      <select
+                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none"
+                        value={typeSearch}
+                        onChange={(e) => setTypeSearch(e.target.value)}
+                      >
+                        <option value="">Alle Types</option>
+                        {uniqueTypes.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 
                 <div className="flex gap-2 w-full lg:w-auto">
                   <button 
@@ -546,6 +575,36 @@ export default function App() {
 
               {activePage === 'dashboard' ? (
                 <div className="space-y-8">
+                  {/* Personnel Info Card */}
+                  {searchedPersonnel && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white border border-emerald-200 rounded-2xl shadow-sm overflow-hidden"
+                    >
+                      <div className="bg-emerald-600 px-6 py-3 flex items-center justify-between">
+                        <h3 className="text-white font-bold flex items-center gap-2">
+                          <Database size={18} />
+                          Personeelsgegevens
+                        </h3>
+                        <span className="text-emerald-100 text-xs font-medium uppercase tracking-wider">
+                          Bron: personeelsficheGB.json
+                        </span>
+                      </div>
+                      <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {Object.entries(searchedPersonnel).map(([key, value]) => {
+                          if (typeof value === 'object' && value !== null) return null;
+                          return (
+                            <div key={key}>
+                              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{key}</p>
+                              <p className="text-sm font-semibold text-zinc-900">{String(value)}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* Dashboard Grid */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Vehicle Type Bar Chart */}
