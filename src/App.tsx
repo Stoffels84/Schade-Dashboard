@@ -51,6 +51,7 @@ export default function App() {
   const [data, setData] = useState<DamageRecord[]>([]);
   const [seniorityData, setSeniorityData] = useState<any[]>([]);
   const [personnelInfo, setPersonnelInfo] = useState<any>(null);
+  const [personnelStatus, setPersonnelStatus] = useState<string>('idle');
   const [headers, setHeaders] = useState<string[]>([]);
 
   const groupedSeniorityData = useMemo(() => {
@@ -172,6 +173,9 @@ export default function App() {
         }
         if (result.personnelData) {
           setPersonnelInfo(result.personnelData);
+        }
+        if (result.personnelStatus) {
+          setPersonnelStatus(result.personnelStatus);
         }
         setFtpStatus('success');
       } else {
@@ -302,19 +306,51 @@ export default function App() {
   const searchedPersonnel = useMemo(() => {
     if (!searchQuery || !personnelInfo) return null;
     
+    const q = searchQuery.toLowerCase().trim();
+    
     // Try to find the person in the JSON data
-    // The JSON could be an array of objects or an object with IDs as keys
     if (Array.isArray(personnelInfo)) {
-      return personnelInfo.find(p => 
-        String(p.personeelsnr || p.Personeelsnr || p.ID || p.id || '').toLowerCase() === searchQuery.toLowerCase()
-      );
+      return personnelInfo.find(p => {
+        const id = String(
+          p.personeelsnr || 
+          p.Personeelsnr || 
+          p.ID || 
+          p.id || 
+          p.Stamnummer || 
+          p.stamnummer || 
+          p['Personeels Nr'] ||
+          ''
+        ).toLowerCase().trim();
+        
+        // Match exact or with/without leading zeros
+        return id === q || 
+               id.replace(/^0+/, '') === q.replace(/^0+/, '') ||
+               (id.length > 0 && q.length > 0 && (id.includes(q) || q.includes(id)));
+      });
     } else {
       // If it's an object, check if the searchQuery is a key
-      if (personnelInfo[searchQuery]) return personnelInfo[searchQuery];
+      const keys = Object.keys(personnelInfo);
+      const matchingKey = keys.find(k => {
+        const normalizedK = k.toLowerCase().trim();
+        return normalizedK === q || normalizedK.replace(/^0+/, '') === q.replace(/^0+/, '');
+      });
+      if (matchingKey) return personnelInfo[matchingKey];
+
       // Or search through values
-      return Object.values(personnelInfo).find((p: any) => 
-        String(p.personeelsnr || p.Personeelsnr || p.ID || p.id || '').toLowerCase() === searchQuery.toLowerCase()
-      );
+      return Object.values(personnelInfo).find((p: any) => {
+        if (typeof p !== 'object' || p === null) return false;
+        const id = String(
+          p.personeelsnr || 
+          p.Personeelsnr || 
+          p.ID || 
+          p.id || 
+          p.Stamnummer || 
+          p.stamnummer || 
+          p['Personeels Nr'] ||
+          ''
+        ).toLowerCase().trim();
+        return id === q || id.replace(/^0+/, '') === q.replace(/^0+/, '');
+      });
     }
   }, [searchQuery, personnelInfo]);
 
@@ -345,8 +381,14 @@ export default function App() {
           </button>
 
           {isSidebarOpen && (
-            <div className="px-3 mb-2 mt-6">
+            <div className="px-3 mb-2 mt-6 flex items-center justify-between">
               <span className="text-sm font-black text-emerald-400 uppercase tracking-[0.2em]">Schade</span>
+              {personnelStatus === 'success' && (
+                <div className="flex items-center gap-1" title="Personeelsdatabase geladen">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <Database size={12} className="text-emerald-500" />
+                </div>
+              )}
             </div>
           )}
           
@@ -576,36 +618,133 @@ export default function App() {
               {activePage === 'dashboard' ? (
                 <div className="space-y-8">
                   {/* Personnel Info Card */}
-                  {searchedPersonnel && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-white border border-emerald-200 rounded-2xl shadow-sm overflow-hidden"
-                    >
-                      <div className="bg-emerald-600 px-6 py-3 flex items-center justify-between">
-                        <h3 className="text-white font-bold flex items-center gap-2">
-                          <Database size={18} />
-                          Personeelsgegevens
-                        </h3>
-                        <span className="text-emerald-100 text-xs font-medium uppercase tracking-wider">
-                          Bron: personeelsficheGB.json
-                        </span>
-                      </div>
-                      <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {Object.entries(searchedPersonnel).map(([key, value]) => {
-                          if (typeof value === 'object' && value !== null) return null;
-                          return (
-                            <div key={key}>
-                              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{key}</p>
-                              <p className="text-sm font-semibold text-zinc-900">{String(value)}</p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
+                  {searchQuery && (
+                    <div className="space-y-4">
+                      {searchedPersonnel ? (
+                        <motion.div 
+                          initial={{ opacity: 0, y: -20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-white border border-emerald-200 rounded-2xl shadow-sm overflow-hidden"
+                        >
+                          <div className="bg-emerald-600 px-6 py-3 flex items-center justify-between">
+                            <h3 className="text-white font-bold flex items-center gap-2">
+                              <Database size={18} />
+                              Personeelsgegevens: {searchQuery}
+                            </h3>
+                            <span className="text-emerald-100 text-xs font-medium uppercase tracking-wider">
+                              Bron: personeelsficheGB.json
+                            </span>
+                          </div>
+                          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {Object.entries(searchedPersonnel).map(([key, value]) => {
+                              if (typeof value === 'object' && value !== null) return null;
+                              if (!value || value === 'null' || value === 'undefined') return null;
+                              return (
+                                <div key={key} className="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
+                                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{key}</p>
+                                  <p className="text-sm font-semibold text-zinc-900 break-words">{String(value)}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <div className="bg-zinc-100 border border-zinc-200 p-6 rounded-2xl flex flex-col items-center justify-center text-zinc-500">
+                          <Search size={32} className="mb-2 opacity-20" />
+                          <p className="font-medium">Geen personeelsgegevens gevonden voor "{searchQuery}"</p>
+                          <p className="text-xs mt-1">Status database: <span className="font-mono font-bold">{personnelStatus}</span></p>
+                        </div>
+                      )}
+                    </div>
                   )}
 
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
+                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Totaal Schades</p>
+                      <p className="text-3xl font-black text-zinc-900">{stats.totalIncidents}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
+                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Unieke Chauffeurs</p>
+                      <p className="text-3xl font-black text-zinc-900">
+                        {new Set(filteredData.map(d => d.personeelsnr)).size}
+                      </p>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
+                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Unieke Voertuigen</p>
+                      <p className="text-3xl font-black text-zinc-900">
+                        {new Set(filteredData.map(d => d.bus_tram)).size}
+                      </p>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
+                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Unieke Locaties</p>
+                      <p className="text-3xl font-black text-zinc-900">
+                        {new Set(filteredData.map(d => d.locatie)).size}
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Dashboard Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Damage Type Chart */}
+                    <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
+                      <div className="flex items-center gap-2 mb-6">
+                        <AlertCircle size={18} className="text-emerald-600" />
+                        <h3 className="font-semibold text-zinc-900">Top 5 Schade Types</h3>
+                      </div>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={stats.byType} layout="vertical" margin={{ left: 40 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+                            <XAxis type="number" hide />
+                            <YAxis 
+                              dataKey="name" 
+                              type="category" 
+                              width={120} 
+                              tick={{ fontSize: 11, fill: '#71717a' }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip 
+                              cursor={{ fill: '#f8fafc' }}
+                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                            />
+                            <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Location Chart */}
+                    <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
+                      <div className="flex items-center gap-2 mb-6">
+                        <MapPin size={18} className="text-emerald-600" />
+                        <h3 className="font-semibold text-zinc-900">Top 5 Locaties</h3>
+                      </div>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={stats.byLocation} layout="vertical" margin={{ left: 40 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+                            <XAxis type="number" hide />
+                            <YAxis 
+                              dataKey="name" 
+                              type="category" 
+                              width={120} 
+                              tick={{ fontSize: 11, fill: '#71717a' }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip 
+                              cursor={{ fill: '#f8fafc' }}
+                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                            />
+                            <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Vehicle Type Bar Chart */}
                     <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm lg:col-span-2">

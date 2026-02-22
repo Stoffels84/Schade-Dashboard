@@ -90,6 +90,7 @@ export default async function handler(req: any, res: any) {
     }
     // Fetch personeelsficheGB.json
     let personnelData = null;
+    let personnelStatus = "not_found";
     try {
       const jsonChunks: any[] = [];
       const jsonWritableStream = new Stream.Writable({
@@ -98,20 +99,43 @@ export default async function handler(req: any, res: any) {
           next();
         }
       });
-      // Assuming it's in the same directory as the Excel file
+      
+      // Try multiple path variations
       const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '';
-      await client.downloadTo(jsonWritableStream, `${dir}personeelsficheGB.json`);
-      const jsonBuffer = Buffer.concat(jsonChunks);
-      personnelData = JSON.parse(jsonBuffer.toString());
-    } catch (e) {
+      const fileName = "personeelsficheGB.json";
+      const possiblePaths = [
+        `${dir}${fileName}`,
+        fileName,
+        `/${fileName}`
+      ];
+
+      let success = false;
+      for (const p of possiblePaths) {
+        try {
+          await client.downloadTo(jsonWritableStream, p);
+          success = true;
+          break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (success) {
+        const jsonBuffer = Buffer.concat(jsonChunks);
+        personnelData = JSON.parse(jsonBuffer.toString());
+        personnelStatus = "success";
+      }
+    } catch (e: any) {
       console.warn("Could not fetch personeelsficheGB.json:", e);
+      personnelStatus = `error: ${e.message}`;
     }
 
     res.status(200).json({ 
       success: true, 
       data: bronData,
       seniorityData: seniorityData,
-      personnelData: personnelData
+      personnelData: personnelData,
+      personnelStatus: personnelStatus
     });
   } catch (error: any) {
     console.error("Vercel API Error:", error);
