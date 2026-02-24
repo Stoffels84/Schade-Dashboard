@@ -101,6 +101,9 @@ function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) =
           </div>
           <h1 className="text-2xl font-bold">OT Gent</h1>
           <p className="text-delijn-dark/70 mt-1">Analyse en rapportering</p>
+          <p className="text-[10px] text-delijn-dark/50 mt-2 font-medium uppercase tracking-wider">
+            Schade - Coaching - Gesprekken - Personeelsfiche
+          </p>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
@@ -166,7 +169,7 @@ function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) =
 
 export default function App() {
   const [activePage, setActivePage] = useState<'dashboard' | 'topcrashers' | 'locatie' | 'voertuig' | 'seniority' | 'coaching'>('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [data, setData] = useState<DamageRecord[]>([]);
   const [seniorityData, setSeniorityData] = useState<any[]>([]);
   const [personnelInfo, setPersonnelInfo] = useState<any>(null);
