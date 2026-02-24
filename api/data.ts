@@ -59,13 +59,14 @@ export default async function handler(req: any, res: any) {
       const buffer = Buffer.concat(chunks);
       const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
       
-      const wsBron = wb.Sheets['BRON'];
-      if (!wsBron) {
+      const sheetNames = wb.SheetNames;
+      const bronSheetName = sheetNames.find(name => name.toUpperCase() === 'BRON');
+      
+      if (!bronSheetName) {
         throw new Error('Tabblad "BRON" niet gevonden');
       }
+      const wsBron = wb.Sheets[bronSheetName];
       bronData = XLSX.utils.sheet_to_json(wsBron) as any[];
-
-      const sheetNames = wb.SheetNames;
       const seniorityTabName = sheetNames.find(name => 
         name.toLowerCase().replace(/\s/g, '') === 'schades-dienstjaar' || 
         name.toLowerCase().replace(/\s/g, '') === 'schadesdienstjaar'

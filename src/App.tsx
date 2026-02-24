@@ -41,7 +41,9 @@ import {
   Pie,
   Cell,
   LineChart,
-  Line
+  Line,
+  LabelList,
+  Legend
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { DamageRecord, DashboardStats } from './types';
@@ -222,11 +224,86 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [ftpStatus, setFtpStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
+  const parseExcelDate = (d: any): Date | null => {
+    if (!d) return null;
+    if (d instanceof Date) return d;
+    
+    // Handle Excel serial numbers
+    if (typeof d === 'number') {
+      // Excel dates are days since 1900-01-01
+      return new Date(Math.round((d - 25569) * 86400 * 1000));
+    }
+    
+    if (typeof d === 'string') {
+      const s = d.trim();
+      if (!s) return null;
+
+      // Try DD/MM/YYYY or DD-MM-YYYY
+      const parts = s.split(/[\/\-.]/);
+      if (parts.length === 3) {
+        let day = parseInt(parts[0]);
+        let month = parseInt(parts[1]) - 1;
+        let year = parseInt(parts[2]);
+        
+        // Handle YYYY/MM/DD
+        if (day > 1000) {
+          const temp = day;
+          day = year;
+          year = temp;
+        }
+
+        if (year < 100) year += 2000;
+        const date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) return date;
+      }
+      
+      // Try YYYYMMDD
+      if (/^\d{8}$/.test(s)) {
+        const year = parseInt(s.substring(0, 4));
+        const month = parseInt(s.substring(4, 6)) - 1;
+        const day = parseInt(s.substring(6, 8));
+        const date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) return date;
+      }
+
+      // Try standard parsing
+      const date = new Date(s);
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    return null;
+  };
+
   const formatDate = (d: any) => {
-    if (!d) return '-';
-    const date = d instanceof Date ? d : new Date(d);
-    if (isNaN(date.getTime())) return String(d);
+    const date = parseExcelDate(d);
+    if (!date) return String(d || '-');
     return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+  };
+
+  const findValue = (row: any, possibleKeys: string[], aggressive = false) => {
+    const keys = Object.keys(row);
+    const normalizedPossible = possibleKeys.map(k => k.toLowerCase().replace(/[\s\-_]/g, ''));
+    
+    // Exact (normalized) match first
+    for (const key of keys) {
+      const normalizedKey = key.toLowerCase().replace(/[\s\-_]/g, '');
+      if (normalizedPossible.includes(normalizedKey)) {
+        return row[key];
+      }
+    }
+
+    // Aggressive partial match if requested
+    if (aggressive) {
+      for (const key of keys) {
+        const normalizedKey = key.toLowerCase().replace(/[\s\-_]/g, '');
+        for (const p of normalizedPossible) {
+          if (normalizedKey.includes(p) || p.includes(normalizedKey)) {
+            return row[key];
+          }
+        }
+      }
+    }
+    return undefined;
   };
 
   const processRawData = useCallback((rawData: any[]) => {
@@ -235,7 +312,7 @@ export default function App() {
     }
 
     const mappedData: DamageRecord[] = rawData.map((row: any) => {
-      const rawType = String(row['Type'] || row['type'] || '').trim();
+      const rawType = String(findValue(row, ['Type', 'Voertuigtype'], true) || '').trim();
       let voertuigCategory = 'Overig';
       const lowerType = rawType.toLowerCase();
       
@@ -245,44 +322,35 @@ export default function App() {
       else if (lowerType.includes('hermelijn')) voertuigCategory = 'Hermelijn';
       else if (rawType) voertuigCategory = rawType;
 
-      const busTramMode = String(row['bus/tram'] || row['Bus/Tram'] || row['Voertuig'] || row['voertuig'] || '').trim();
+      const busTramMode = String(findValue(row, ['bus/tram', 'Voertuig', 'Mode'], true) || '').trim();
 
       const damageTypeValue = String(
-        row['Schade'] || 
-        row['schade'] || 
-        row['Soort'] || 
-        row['soort'] || 
-        row['Type Schade'] || 
-        row['Schade Type'] || 
-        row['Omschrijving'] || 
+        findValue(row, ['Schade', 'Soort', 'Type Schade', 'Schade Type', 'Omschrijving', 'Aard'], true) || 
         ''
       ).trim();
 
+      const rawDate = findValue(row, ['Datum', 'Date', 'Incident Datum', 'Tijdstip', 'Dag'], true);
+      const parsedDate = parseExcelDate(rawDate);
+
       return {
-        personeelsnr: String(row['personeelsnr'] || row['Personeelsnr'] || row['ID'] || row['stamnr'] || '').trim(),
+        personeelsnr: String(findValue(row, ['personeelsnr', 'ID', 'stamnr', 'stamnummer', 'P-nr', 'Personeels Nr', 'Chauffeur ID', 'Bestuurder ID', 'Stam Nr'], true) || '').trim(),
         naam: String(
-          row['Volledige Naam'] || 
-          row['volledige naam'] || 
-          row['Volledige naam'] || 
-          row['VOLLEDIGE NAAM'] || 
-          row['Naam'] || 
-          row['naam'] || 
-          row['Chauffeur'] || 
-          row['Bestuurder'] || 
-          row['bestuurder'] || 
-          row['TEAMCOACH'] || 
-          row['Teamcoach'] || 
+          findValue(row, ['Volledige Naam', 'Naam', 'Chauffeur', 'Bestuurder', 'Bestuurder Naam', 'Naam Chauffeur', 'Naam Bestuurder'], true) || 
           'Onbekend'
         ).trim(),
-        locatie: String(row['locatie'] || row['Locatie'] || row['Plaats'] || '').trim(),
-        datum: formatDate(row['Datum'] || row['datum']),
-        link: String(row['link'] || row['Link'] || '').trim(),
+        locatie: String(findValue(row, ['locatie', 'Plaats', 'Gemeente', 'Stad', 'Adres', 'Lijn'], true) || '').trim(),
+        datum: formatDate(rawDate),
+        parsedDate,
+        link: String(findValue(row, ['link', 'URL'], true) || '').trim(),
         type: voertuigCategory,
         damageType: damageTypeValue || 'Onbekend',
         bus_tram: busTramMode || 'Onbekend',
         rawData: row,
       };
-    }).filter(r => r.personeelsnr);
+    }).filter(r => {
+      // Keep any row that has at least some identifiable data
+      return r.parsedDate || r.personeelsnr || (r.naam && r.naam !== 'Onbekend') || r.locatie || r.damageType !== 'Onbekend';
+    });
 
     setData(mappedData);
   }, []);
@@ -432,6 +500,12 @@ export default function App() {
     const typeCount: Record<string, number> = {};
     const vehicleCount: Record<string, number> = {};
     const locationCount: Record<string, number> = {};
+    const monthYearCount: Record<string, Record<string, number>> = {};
+
+    const monthNames = [
+      'Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni',
+      'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'
+    ];
 
     targetData.forEach(item => {
       const dType = item.damageType || 'Onbekend';
@@ -441,7 +515,22 @@ export default function App() {
       typeCount[dType] = (typeCount[dType] || 0) + 1;
       vehicleCount[vType] = (vehicleCount[vType] || 0) + 1;
       locationCount[loc] = (locationCount[loc] || 0) + 1;
+
+      // Month/Year grouping
+      const date = item.parsedDate;
+
+      if (date && !isNaN(date.getTime())) {
+        const month = monthNames[date.getMonth()];
+        const year = date.getFullYear().toString();
+        if (!monthYearCount[month]) monthYearCount[month] = {};
+        monthYearCount[month][year] = (monthYearCount[month][year] || 0) + 1;
+      }
     });
+
+    const byMonthYear = monthNames.map(month => ({
+      month,
+      ...monthYearCount[month]
+    }));
 
     return {
       totalIncidents: targetData.length,
@@ -456,6 +545,7 @@ export default function App() {
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value)
         .slice(0, 10),
+      byMonthYear
     };
   }, [filteredData]);
 
@@ -1028,6 +1118,65 @@ export default function App() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Monthly Damage Chart */}
+                  {!searchQuery && (() => {
+                    const yearTotals: Record<string, number> = { '2024': 0, '2025': 0, '2026': 0 };
+                    stats.byMonthYear.forEach(m => {
+                      yearTotals['2024'] += (m['2024'] as number || 0);
+                      yearTotals['2025'] += (m['2025'] as number || 0);
+                      yearTotals['2026'] += (m['2026'] as number || 0);
+                    });
+
+                    return (
+                      <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
+                        <div className="flex items-center gap-2 mb-6">
+                          <Calendar size={18} className="text-delijn-yellow" />
+                          <h3 className="font-semibold text-zinc-900">Schades per Maand en Jaar</h3>
+                        </div>
+                        <div className="h-[500px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.byMonthYear} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                              <XAxis 
+                                dataKey="month" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 11, fill: '#71717a' }}
+                              />
+                              <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 11, fill: '#71717a' }}
+                                allowDecimals={false}
+                                interval={0}
+                              />
+                              <Tooltip 
+                                cursor={{ fill: '#f8fafc' }}
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                              />
+                              <Legend 
+                                verticalAlign="top" 
+                                align="right" 
+                                iconType="circle" 
+                                formatter={(value) => `${value} (Totaal: ${yearTotals[value]})`}
+                                wrapperStyle={{ paddingBottom: '20px', fontSize: '13px', fontWeight: 'bold' }} 
+                              />
+                              <Bar dataKey="2024" fill="#FFD200" radius={[4, 4, 0, 0]} name="2024">
+                                <LabelList dataKey="2024" position="top" offset={10} style={{ fontSize: '18px', fill: '#000000', fontWeight: '900' }} />
+                              </Bar>
+                              <Bar dataKey="2025" fill="#1A1A1A" radius={[4, 4, 0, 0]} name="2025">
+                                <LabelList dataKey="2025" position="top" offset={10} style={{ fontSize: '18px', fill: '#000000', fontWeight: '900' }} />
+                              </Bar>
+                              <Bar dataKey="2026" fill="#3b82f6" radius={[4, 4, 0, 0]} name="2026">
+                                <LabelList dataKey="2026" position="top" offset={10} style={{ fontSize: '18px', fill: '#000000', fontWeight: '900' }} />
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Dashboard Grid */}
                   <div className="space-y-6">

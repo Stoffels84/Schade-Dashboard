@@ -3,6 +3,7 @@ export interface DamageRecord {
   naam: string;
   locatie: string;
   datum: string;
+  parsedDate: Date | null;
   link: string;
   type: string; // This is the vehicle category (Standaard, etc.)
   damageType: string; // This is the damage description
@@ -15,4 +16,5 @@ export interface DashboardStats {
   byType: { name: string; value: number }[];
   byVehicle: { name: string; value: number }[];
   byLocation: { name: string; value: number }[];
+  byMonthYear: { month: string; [year: string]: number | string }[];
 }
