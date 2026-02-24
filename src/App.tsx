@@ -1137,8 +1137,8 @@ export default function App() {
                           <Calendar size={18} className="text-delijn-yellow" />
                           <h3 className="font-semibold text-zinc-900">Schades per Maand en Jaar</h3>
                         </div>
-                        <div className="h-[500px] w-full min-h-[500px] min-w-0 relative">
-                          <ResponsiveContainer width="100%" height="100%" debounce={100} minHeight={500}>
+                        <div className="h-[500px] w-full relative">
+                          <ResponsiveContainer width="100%" height={500} debounce={100}>
                             <BarChart data={stats.byMonthYear} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                               <XAxis 
@@ -1189,8 +1189,8 @@ export default function App() {
                         <MapPin size={18} className="text-delijn-yellow" />
                         <h3 className="font-semibold text-zinc-900">Top 5 Locaties</h3>
                       </div>
-                      <div className="h-[300px] w-full min-h-[300px] min-w-0 relative">
-                        <ResponsiveContainer width="100%" height="100%" debounce={100} minHeight={300}>
+                      <div className="h-[300px] w-full relative">
+                        <ResponsiveContainer width="100%" height={300} debounce={100}>
                           <BarChart data={stats.byLocation} layout="vertical" margin={{ left: 40 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
                             <XAxis type="number" hide />
@@ -1220,8 +1220,8 @@ export default function App() {
                         <BarChart3 size={18} className="text-delijn-yellow" />
                         <h3 className="font-semibold text-zinc-900">Voertuig Type Overzicht</h3>
                       </div>
-                      <div className="h-[300px] w-full min-h-[300px] min-w-0 relative">
-                        <ResponsiveContainer width="100%" height="100%" debounce={100} minHeight={300}>
+                      <div className="h-[300px] w-full relative">
+                        <ResponsiveContainer width="100%" height={300} debounce={100}>
                           <BarChart data={stats.byVehicle} layout="vertical" margin={{ left: 20 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
                             <XAxis type="number" hide />
@@ -1249,8 +1249,8 @@ export default function App() {
                         <Bus size={18} className="text-delijn-yellow" />
                         <h3 className="font-semibold text-zinc-900">Voertuig Type</h3>
                       </div>
-                      <div className="h-[300px] w-full min-h-[300px] min-w-0 relative">
-                        <ResponsiveContainer width="100%" height="100%" debounce={100} minHeight={300}>
+                      <div className="h-[300px] w-full relative">
+                        <ResponsiveContainer width="100%" height={300} debounce={100}>
                           <PieChart>
                             <Pie
                               data={stats.byVehicle}
@@ -1771,8 +1771,8 @@ export default function App() {
                       Gemiddelde Schades per Dienstjaar Bundel
                     </h3>
                     {groupedSeniorityData.length > 0 ? (
-                      <div className="h-[400px] w-full min-h-[400px] min-w-0 relative">
-                        <ResponsiveContainer width="100%" height="100%" debounce={100} minHeight={400}>
+                      <div className="h-[400px] w-full relative">
+                        <ResponsiveContainer width="100%" height={400} debounce={100}>
                           <BarChart data={groupedSeniorityData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                             <XAxis 
