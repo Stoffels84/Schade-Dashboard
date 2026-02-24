@@ -47,7 +47,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { DamageRecord, DashboardStats } from './types';
 import { cn } from './lib/utils';
 
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const COLORS = ['#FFD200', '#1A1A1A', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const EXCLUDED_HEADERS = [
   'personeelsnr', 'Personeelsnr', 'ID', 'stamnr',
@@ -81,12 +81,24 @@ function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) =
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-zinc-200 overflow-hidden"
       >
-        <div className="bg-emerald-600 p-8 text-white text-center">
-          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Lock size={32} />
+        <div className="bg-delijn-yellow p-8 text-delijn-dark text-center">
+          <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 p-2 shadow-sm">
+            <img 
+              src="/api/logo" 
+              alt="De Lijn Logo" 
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                // Fallback to Lock icon if logo is missing
+                e.currentTarget.style.display = 'none';
+                const parent = e.currentTarget.parentElement;
+                if (parent) {
+                  parent.innerHTML = '<div class="text-delijn-dark opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>';
+                }
+              }}
+            />
           </div>
           <h1 className="text-2xl font-bold">OT Gent</h1>
-          <p className="text-emerald-100 mt-1">Analyse en rapportering</p>
+          <p className="text-delijn-dark/70 mt-1">Analyse en rapportering</p>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
@@ -99,7 +111,7 @@ function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) =
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
-              className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:opacity-50"
+              className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-delijn-yellow focus:border-delijn-yellow outline-none transition-all disabled:opacity-50"
               placeholder="Je naam"
             />
           </div>
@@ -113,7 +125,7 @@ function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) =
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
-              className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:opacity-50"
+              className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-delijn-yellow focus:border-delijn-yellow outline-none transition-all disabled:opacity-50"
               placeholder="••••••••"
             />
           </div>
@@ -127,7 +139,7 @@ function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) =
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full bg-delijn-yellow hover:opacity-90 text-delijn-dark font-semibold py-3 rounded-xl transition-all shadow-lg shadow-delijn-yellow/20 flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLoading ? (
               <>
@@ -151,7 +163,7 @@ function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) =
 }
 
 export default function App() {
-  const [activePage, setActivePage] = useState<'dashboard' | 'topcrashers' | 'locatie' | 'voertuig' | 'seniority'>('dashboard');
+  const [activePage, setActivePage] = useState<'dashboard' | 'topcrashers' | 'locatie' | 'voertuig' | 'seniority' | 'coaching'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [data, setData] = useState<DamageRecord[]>([]);
   const [seniorityData, setSeniorityData] = useState<any[]>([]);
@@ -163,6 +175,7 @@ export default function App() {
   const [allowedUsers, setAllowedUsers] = useState<any[]>([]);
   const [fileStatuses, setFileStatuses] = useState<Record<string, { status: 'success' | 'error' | 'not_found', message?: string }>>({});
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [conversationsData, setConversationsData] = useState<any[]>([]);
 
   const groupedSeniorityData = useMemo(() => {
     if (!seniorityData.length) return [];
@@ -208,6 +221,13 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ftpStatus, setFtpStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const formatDate = (d: any) => {
+    if (!d) return '-';
+    const date = d instanceof Date ? d : new Date(d);
+    if (isNaN(date.getTime())) return String(d);
+    return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+  };
 
   const processRawData = useCallback((rawData: any[]) => {
     if (rawData.length > 0) {
@@ -255,9 +275,7 @@ export default function App() {
           'Onbekend'
         ).trim(),
         locatie: String(row['locatie'] || row['Locatie'] || row['Plaats'] || '').trim(),
-        datum: (row['Datum'] || row['datum']) instanceof Date 
-          ? `${String((row['Datum'] || row['datum']).getDate()).padStart(2, '0')}-${String((row['Datum'] || row['datum']).getMonth() + 1).padStart(2, '0')}-${(row['Datum'] || row['datum']).getFullYear()}`
-          : String(row['Datum'] || row['datum'] || ''),
+        datum: formatDate(row['Datum'] || row['datum']),
         link: String(row['link'] || row['Link'] || '').trim(),
         type: voertuigCategory,
         damageType: damageTypeValue || 'Onbekend',
@@ -292,6 +310,9 @@ export default function App() {
         }
         if (result.fileStatuses) {
           setFileStatuses(result.fileStatuses);
+        }
+        if (result.conversationsData) {
+          setConversationsData(result.conversationsData);
         }
         setFtpStatus('success');
       } else {
@@ -357,18 +378,25 @@ export default function App() {
       
       let matchesDate = true;
       if (startDate || endDate) {
-        // Parse DD-MM-YYYY or other formats to Date object
         let itemDate: Date | null = null;
-        const parts = item.datum.split(/[-/]/).map(Number);
+        
+        // Handle ISO strings or strings with time
+        const datePart = item.datum.includes('T') ? item.datum.split('T')[0] : item.datum;
+        const parts = datePart.split(/[-/]/).map(p => parseInt(p, 10));
         
         if (parts.length === 3) {
-          // Check if it's DD-MM-YYYY or YYYY-MM-DD
           if (parts[0] > 1000) {
             // YYYY-MM-DD
             itemDate = new Date(parts[0], parts[1] - 1, parts[2]);
           } else {
             // DD-MM-YYYY
             itemDate = new Date(parts[2], parts[1] - 1, parts[0]);
+          }
+        } else {
+          // Final fallback
+          const fallback = new Date(item.datum);
+          if (!isNaN(fallback.getTime())) {
+            itemDate = fallback;
           }
         }
 
@@ -522,6 +550,60 @@ export default function App() {
     };
   }, [searchQuery, coachingData]);
 
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery) return [];
+    const q = searchQuery.toLowerCase().trim();
+    
+    return conversationsData.filter(item => {
+      const pNr = String(item['nummer'] || item['Nummer'] || '').toLowerCase().trim();
+      return pNr === q || (pNr.length > 0 && pNr.replace(/^0+/, '') === q.replace(/^0+/, ''));
+    });
+  }, [searchQuery, conversationsData]);
+
+  const coachingList = useMemo(() => {
+    const driverStats: Record<string, { count: number; name: string }> = {};
+    
+    // Use filteredData to respect global filters
+    filteredData.forEach(item => {
+      const pNr = item.personeelsnr;
+      if (!driverStats[pNr]) {
+        driverStats[pNr] = { count: 0, name: item.naam };
+      }
+      driverStats[pNr].count++;
+    });
+
+    const normalizePNr = (p: any) => String(p || '').toLowerCase().trim().replace(/^0+/, '');
+
+    const completedPNrs = new Set(
+      coachingData.completed.map(item => 
+        normalizePNr(item['P-nr'] || item['p-nr'] || item['Personeelsnr'] || item['PersoneelsNr'])
+      )
+    );
+
+    const requestedPNrs = new Set(
+      coachingData.requested.map(item => 
+        normalizePNr(item['P-nr'] || item['p-nr'] || item['Personeelsnr'] || item['PersoneelsNr'])
+      )
+    );
+
+    return Object.entries(driverStats)
+      .filter(([pNr, stats]) => {
+        const normalizedPNr = normalizePNr(pNr);
+        // More than 2 incidents AND not in completed list
+        return stats.count > 2 && !completedPNrs.has(normalizedPNr);
+      })
+      .map(([pNr, stats]) => {
+        const normalizedPNr = normalizePNr(pNr);
+        return {
+          pNr,
+          name: stats.name,
+          count: stats.count,
+          isPlanned: requestedPNrs.has(normalizedPNr)
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+  }, [filteredData, coachingData]);
+
   const handleLogin = (user: string, pass: string) => {
     const found = allowedUsers.find(u => {
       const uName = String(u['Naam'] || u['naam'] || '').trim();
@@ -549,7 +631,21 @@ export default function App() {
         !isSidebarOpen && "-ml-64 lg:ml-0 lg:w-20"
       )}>
         <div className="h-16 flex items-center px-6 border-b border-zinc-800">
-          <Bus className="text-emerald-500 w-6 h-6 flex-shrink-0" />
+          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center flex-shrink-0 p-1 shadow-sm overflow-hidden">
+            <img 
+              src="/api/logo" 
+              alt="L" 
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const parent = e.currentTarget.parentElement;
+                if (parent) {
+                  parent.innerHTML = '<span class="font-black text-delijn-dark text-xl">L</span>';
+                  parent.className = "w-10 h-10 bg-delijn-yellow rounded-lg flex items-center justify-center flex-shrink-0";
+                }
+              }}
+            />
+          </div>
           {isSidebarOpen && (
             <div className="ml-3 flex flex-col">
               <span className="text-white font-bold tracking-tight whitespace-nowrap leading-tight">OT Gent</span>
@@ -563,7 +659,7 @@ export default function App() {
             onClick={() => setActivePage('dashboard')}
             className={cn(
               "w-full flex items-center px-3 py-2 rounded-lg transition-colors mb-6",
-              activePage === 'dashboard' ? "bg-emerald-600 text-white" : "text-emerald-400 hover:bg-zinc-800"
+              activePage === 'dashboard' ? "bg-delijn-yellow text-delijn-dark" : "text-delijn-yellow hover:bg-zinc-800"
             )}
           >
             <LayoutDashboard size={20} />
@@ -572,11 +668,11 @@ export default function App() {
 
           {isSidebarOpen && (
             <div className="px-3 mb-2 mt-6 flex items-center justify-between">
-              <span className="text-sm font-black text-emerald-400 uppercase tracking-[0.2em]">Schade</span>
+              <span className="text-sm font-black text-delijn-yellow uppercase tracking-[0.2em]">Schade</span>
               {personnelStatus === 'success' && (
                 <div className="flex items-center gap-1" title="Personeelsdatabase geladen">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                  <Database size={12} className="text-emerald-500" />
+                  <div className="w-2 h-2 rounded-full bg-delijn-yellow animate-pulse"></div>
+                  <Database size={12} className="text-delijn-yellow" />
                 </div>
               )}
             </div>
@@ -586,7 +682,7 @@ export default function App() {
             onClick={() => setActivePage('topcrashers')}
             className={cn(
               "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
-              activePage === 'topcrashers' ? "bg-emerald-600 text-white" : "hover:bg-zinc-800 hover:text-zinc-200"
+              activePage === 'topcrashers' ? "bg-delijn-yellow text-delijn-dark" : "hover:bg-zinc-800 hover:text-zinc-200"
             )}
           >
             <Trophy size={20} />
@@ -597,7 +693,7 @@ export default function App() {
             onClick={() => setActivePage('locatie')}
             className={cn(
               "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
-              activePage === 'locatie' ? "bg-emerald-600 text-white" : "hover:bg-zinc-800 hover:text-zinc-200"
+              activePage === 'locatie' ? "bg-delijn-yellow text-delijn-dark" : "hover:bg-zinc-800 hover:text-zinc-200"
             )}
           >
             <MapPin size={20} />
@@ -608,7 +704,7 @@ export default function App() {
             onClick={() => setActivePage('voertuig')}
             className={cn(
               "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
-              activePage === 'voertuig' ? "bg-emerald-600 text-white" : "hover:bg-zinc-800 hover:text-zinc-200"
+              activePage === 'voertuig' ? "bg-delijn-yellow text-delijn-dark" : "hover:bg-zinc-800 hover:text-zinc-200"
             )}
           >
             <Bus size={20} />
@@ -619,11 +715,22 @@ export default function App() {
             onClick={() => setActivePage('seniority')}
             className={cn(
               "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
-              activePage === 'seniority' ? "bg-emerald-600 text-white" : "hover:bg-zinc-800 hover:text-zinc-200"
+              activePage === 'seniority' ? "bg-delijn-yellow text-delijn-dark" : "hover:bg-zinc-800 hover:text-zinc-200"
             )}
           >
             <Clock size={20} />
             {isSidebarOpen && <span className="ml-3 font-medium">Anciënniteit</span>}
+          </button>
+
+          <button
+            onClick={() => setActivePage('coaching')}
+            className={cn(
+              "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
+              activePage === 'coaching' ? "bg-delijn-yellow text-delijn-dark" : "hover:bg-zinc-800 hover:text-zinc-200"
+            )}
+          >
+            <CheckCircle2 size={20} />
+            {isSidebarOpen && <span className="ml-3 font-medium">Coaching</span>}
           </button>
         </nav>
 
@@ -635,7 +742,7 @@ export default function App() {
                 <button 
                   onClick={fetchFTPData}
                   disabled={isLoading}
-                  className="text-zinc-500 hover:text-emerald-500 transition-colors"
+                  className="text-zinc-500 hover:text-delijn-yellow transition-colors"
                   title="Ververs FTP data"
                 >
                   <RefreshCw size={12} className={cn(isLoading && "animate-spin")} />
@@ -644,7 +751,7 @@ export default function App() {
               
               <div className={cn(
                 "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border",
-                ftpStatus === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
+                ftpStatus === 'success' ? "bg-delijn-yellow/10 border-delijn-yellow/20 text-delijn-yellow" :
                 ftpStatus === 'error' ? "bg-red-500/10 border-red-500/20 text-red-400" :
                 ftpStatus === 'loading' ? "bg-blue-500/10 border-blue-500/20 text-blue-400" :
                 "bg-zinc-800/50 border-zinc-700/50 text-zinc-500"
@@ -677,7 +784,7 @@ export default function App() {
                             {fileName}
                           </span>
                           <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                            statusInfo.status === 'success' ? 'text-emerald-400 bg-emerald-500/10' :
+                            statusInfo.status === 'success' ? 'text-delijn-yellow bg-delijn-yellow/10' :
                             statusInfo.status === 'not_found' ? 'text-amber-400 bg-amber-500/10' :
                             'text-red-400 bg-red-500/10'
                           }`}>
@@ -718,7 +825,7 @@ export default function App() {
           <div className="flex items-center gap-4">
             {data.length > 0 && (
               <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-zinc-500 bg-zinc-100 px-3 py-1.5 rounded-full">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-delijn-yellow animate-pulse" />
                 {data.length} records geladen
               </div>
             )}
@@ -740,7 +847,7 @@ export default function App() {
 
           {isLoading && (
             <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-delijn-yellow"></div>
             </div>
           )}
 
@@ -763,7 +870,7 @@ export default function App() {
                         <input
                           type="text"
                           placeholder="Personeelsnr..."
-                          className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                          className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-delijn-yellow/20 focus:border-delijn-yellow transition-all"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -774,7 +881,7 @@ export default function App() {
                       <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Van Datum</label>
                       <input
                         type="date"
-                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-delijn-yellow/20 focus:border-delijn-yellow transition-all"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
                       />
@@ -784,7 +891,7 @@ export default function App() {
                       <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Tot Datum</label>
                       <input
                         type="date"
-                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-delijn-yellow/20 focus:border-delijn-yellow transition-all"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
                       />
@@ -797,7 +904,7 @@ export default function App() {
                         <input
                           type="text"
                           placeholder="Voertuignr..."
-                          className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                          className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-delijn-yellow/20 focus:border-delijn-yellow transition-all"
                           value={vehicleSearch}
                           onChange={(e) => setVehicleSearch(e.target.value)}
                         />
@@ -807,7 +914,7 @@ export default function App() {
                     <div>
                       <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">Filter op Type</label>
                       <select
-                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none"
+                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-delijn-yellow/20 focus:border-delijn-yellow transition-all appearance-none"
                         value={typeSearch}
                         onChange={(e) => setTypeSearch(e.target.value)}
                       >
@@ -832,9 +939,9 @@ export default function App() {
                   >
                     Reset
                   </button>
-                  <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl min-w-[120px] text-center">
-                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest leading-none mb-1">Resultaten</p>
-                    <p className="text-xl font-bold text-emerald-700 leading-none">{filteredData.length}</p>
+                  <div className="bg-delijn-yellow/10 border border-delijn-yellow/20 px-4 py-2 rounded-xl min-w-[120px] text-center">
+                    <p className="text-[10px] font-bold text-delijn-dark uppercase tracking-widest leading-none mb-1">Resultaten</p>
+                    <p className="text-xl font-bold text-delijn-dark leading-none">{filteredData.length}</p>
                   </div>
                 </div>
               </div>
@@ -846,7 +953,7 @@ export default function App() {
                     <div className="flex items-center gap-3">
                       <h2 className="text-xl font-bold text-zinc-900">Dashboard Overzicht</h2>
                       {(searchQuery || startDate || endDate || vehicleSearch || typeSearch) && (
-                        <span className="flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase rounded-md animate-pulse">
+                        <span className="flex items-center gap-1 px-2 py-1 bg-delijn-yellow text-delijn-dark text-[10px] font-bold uppercase rounded-md animate-pulse">
                           <Filter size={10} />
                           Filters Actief
                         </span>
@@ -861,14 +968,14 @@ export default function App() {
                         <motion.div 
                           initial={{ opacity: 0, y: -20 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="bg-white border border-emerald-200 rounded-2xl shadow-sm overflow-hidden"
+                          className="bg-white border border-delijn-yellow/30 rounded-2xl shadow-sm overflow-hidden"
                         >
-                          <div className="bg-emerald-600 px-6 py-3 flex items-center justify-between">
-                            <h3 className="text-white font-bold flex items-center gap-2">
+                          <div className="bg-delijn-yellow px-6 py-3 flex items-center justify-between">
+                            <h3 className="text-delijn-dark font-bold flex items-center gap-2">
                               <Database size={18} />
                               Personeelsgegevens: {searchQuery}
                             </h3>
-                            <span className="text-emerald-100 text-xs font-medium uppercase tracking-wider">
+                            <span className="text-delijn-dark/60 text-xs font-medium uppercase tracking-wider">
                               Bron: personeelsficheGB.json
                             </span>
                           </div>
@@ -924,41 +1031,10 @@ export default function App() {
 
                   {/* Dashboard Grid */}
                   <div className="space-y-6">
-                    {/* Damage Type Chart */}
-                    {!searchQuery && (
-                      <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
-                        <div className="flex items-center gap-2 mb-6">
-                          <AlertCircle size={18} className="text-emerald-600" />
-                          <h3 className="font-semibold text-zinc-900">Top 5 Schade Types</h3>
-                        </div>
-                        <div className="h-[300px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stats.byType} layout="vertical" margin={{ left: 40 }}>
-                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                              <XAxis type="number" hide />
-                              <YAxis 
-                                dataKey="name" 
-                                type="category" 
-                                width={120} 
-                                tick={{ fontSize: 11, fill: '#71717a' }}
-                                axisLine={false}
-                                tickLine={false}
-                              />
-                              <Tooltip 
-                                cursor={{ fill: '#f8fafc' }}
-                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                              />
-                              <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Location Chart - Full Width */}
                     <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
                       <div className="flex items-center gap-2 mb-6">
-                        <MapPin size={18} className="text-emerald-600" />
+                        <MapPin size={18} className="text-delijn-yellow" />
                         <h3 className="font-semibold text-zinc-900">Top 5 Locaties</h3>
                       </div>
                       <div className="h-[300px] w-full">
@@ -989,7 +1065,7 @@ export default function App() {
                     {/* Vehicle Type Bar Chart */}
                     <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm lg:col-span-2">
                       <div className="flex items-center gap-2 mb-6">
-                        <BarChart3 size={18} className="text-emerald-600" />
+                        <BarChart3 size={18} className="text-delijn-yellow" />
                         <h3 className="font-semibold text-zinc-900">Voertuig Type Overzicht</h3>
                       </div>
                       <div className="h-[300px] w-full">
@@ -1009,7 +1085,7 @@ export default function App() {
                               cursor={{ fill: '#f8fafc' }}
                               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                             />
-                            <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} barSize={24} />
+                            <Bar dataKey="value" fill="#FFD200" radius={[0, 4, 4, 0]} barSize={24} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -1018,7 +1094,7 @@ export default function App() {
                     {/* Vehicle Distribution */}
                     <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm">
                       <div className="flex items-center gap-2 mb-6">
-                        <Bus size={18} className="text-emerald-600" />
+                        <Bus size={18} className="text-delijn-yellow" />
                         <h3 className="font-semibold text-zinc-900">Voertuig Type</h3>
                       </div>
                       <div className="h-[300px] w-full">
@@ -1057,11 +1133,50 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Gesprekken Section */}
+                  {searchQuery && filteredConversations.length > 0 && (
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2 px-2">
+                        <FileText className="text-delijn-yellow" size={24} />
+                        <h2 className="text-xl font-bold text-zinc-900">Gesprekken</h2>
+                      </div>
+                      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-zinc-100 bg-zinc-50/30">
+                          <h3 className="font-semibold text-zinc-900">Overzicht gesprekken</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-zinc-50/50">
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Nummer</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Chauffeurnaam</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Datum</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Info</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100">
+                              {filteredConversations.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-zinc-50/80 transition-colors">
+                                  <td className="px-6 py-4 text-sm text-zinc-900">{item['nummer'] || item['Nummer'] || '-'}</td>
+                                  <td className="px-6 py-4 text-sm text-zinc-600">{item['Chauffeurnaam'] || item['chauffeurnaam'] || '-'}</td>
+                                  <td className="px-6 py-4 text-sm text-zinc-600">
+                                    {formatDate(item['Datum'])}
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-zinc-600">{item['Info'] || item['info'] || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Coaching Section */}
                   {searchQuery && (filteredCoaching.requested.length > 0 || filteredCoaching.completed.length > 0) && (
                     <div className="space-y-6">
                       <div className="flex items-center gap-2 px-2">
-                        <CheckCircle2 className="text-emerald-600" size={24} />
+                        <CheckCircle2 className="text-delijn-yellow" size={24} />
                         <h2 className="text-xl font-bold text-zinc-900">Coaching</h2>
                       </div>
 
@@ -1116,9 +1231,7 @@ export default function App() {
                                     <td className="px-6 py-4 text-sm text-zinc-900">{item['P-nr'] || item['p-nr'] || '-'}</td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">{item['Volledige naam'] || item['volledige naam'] || '-'}</td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">
-                                      {item['Datum coaching'] instanceof Date 
-                                        ? item['Datum coaching'].toLocaleDateString('nl-BE')
-                                        : String(item['Datum coaching'] || '-')}
+                                      {formatDate(item['Datum coaching'])}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">{item['Opmerking'] || item['opmerking'] || '-'}</td>
                                   </tr>
@@ -1135,7 +1248,7 @@ export default function App() {
                   {searchQuery && (
                     <div className="space-y-6">
                       <div className="flex items-center gap-2 px-2">
-                        <AlertCircle className="text-emerald-600" size={24} />
+                        <AlertCircle className="text-delijn-yellow" size={24} />
                         <h2 className="text-xl font-bold text-zinc-900">Schade</h2>
                       </div>
                       <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
@@ -1179,7 +1292,7 @@ export default function App() {
                                     <td className="px-6 py-4 text-sm text-zinc-900 font-medium">{record.personeelsnr}</td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">{record.naam}</td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">
-                                      {record.datum.replace(/-/g, '/')}
+                                      {record.datum}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">{record.bus_tram}</td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">{record.type}</td>
@@ -1189,7 +1302,7 @@ export default function App() {
                                           href={record.link} 
                                           target="_blank" 
                                           rel="noopener noreferrer"
-                                          className="text-emerald-600 hover:text-emerald-700 underline font-medium"
+                                          className="text-delijn-dark hover:underline font-medium"
                                         >
                                           klik hier om te openen
                                         </a>
@@ -1266,9 +1379,9 @@ export default function App() {
                                 >
                                   <td className="px-6 py-4 text-sm text-zinc-900 font-medium">{record.personeelsnr}</td>
                                   <td className="px-6 py-4 text-sm text-zinc-600">{record.naam}</td>
-                                  <td className="px-6 py-4 text-sm text-zinc-600">
-                                    {record.datum.replace(/-/g, '/')}
-                                  </td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">
+                                      {record.datum}
+                                    </td>
                                   <td className="px-6 py-4 text-sm text-zinc-600">{record.bus_tram}</td>
                                   <td className="px-6 py-4 text-sm text-zinc-600">{record.type}</td>
                                   <td className="px-6 py-4 text-sm">
@@ -1277,7 +1390,7 @@ export default function App() {
                                         href={record.link} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="text-emerald-600 hover:text-emerald-700 underline font-medium"
+                                        className="text-delijn-dark hover:underline font-medium"
                                       >
                                         klik hier om te openen
                                       </a>
@@ -1332,7 +1445,7 @@ export default function App() {
                                   >
                                     <td className="px-6 py-4 text-sm font-medium text-zinc-900">{pnr}</td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">{chauffeurInfo.naam}</td>
-                                    <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">
+                                    <td className="px-6 py-4 text-sm text-right font-semibold text-delijn-dark">
                                       {chauffeurInfo.count}
                                     </td>
                                   </motion.tr>
@@ -1388,7 +1501,7 @@ export default function App() {
                                 className="hover:bg-zinc-50/80 transition-colors group"
                               >
                                 <td className="px-6 py-4 text-sm font-medium text-zinc-900">{loc}</td>
-                                <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">
+                                <td className="px-6 py-4 text-sm text-right font-semibold text-delijn-dark">
                                   {count}
                                 </td>
                               </motion.tr>
@@ -1399,11 +1512,110 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+              ) : activePage === 'coaching' ? (
+                <div className="space-y-8">
+                  <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
+                        <CheckCircle2 className="text-delijn-yellow" size={20} />
+                        Chauffeurs voor Coaching
+                      </h3>
+                      <div className="flex items-center gap-4 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <span className="text-zinc-500">Gepland</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-zinc-200"></div>
+                          <span className="text-zinc-500">Nog niet gepland</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3 text-amber-800 mb-6">
+                      <AlertCircle className="shrink-0 mt-0.5" size={18} />
+                      <div className="text-sm">
+                        <p className="font-semibold">Criteria voor coaching:</p>
+                        <ul className="list-disc list-inside mt-1 opacity-90">
+                          <li>Meer dan 2 schades in de geselecteerde periode.</li>
+                          <li>Nog geen voltooide coaching geregistreerd.</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-zinc-50/50">
+                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Personeelsnr</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Volledige Naam</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Aantal Schades</th>
+                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                          {coachingList.length > 0 ? (
+                            coachingList.map((driver) => (
+                              <tr 
+                                key={driver.pNr} 
+                                className={cn(
+                                  "hover:bg-zinc-50/80 transition-colors cursor-pointer",
+                                  driver.isPlanned && "bg-red-50/50 hover:bg-red-50"
+                                )}
+                                onClick={() => {
+                                  setSearchQuery(driver.pNr);
+                                  setActivePage('dashboard');
+                                }}
+                              >
+                                <td className={cn(
+                                  "px-6 py-4 text-sm font-medium",
+                                  driver.isPlanned ? "text-red-700" : "text-zinc-900"
+                                )}>
+                                  {driver.pNr}
+                                </td>
+                                <td className={cn(
+                                  "px-6 py-4 text-sm",
+                                  driver.isPlanned ? "text-red-600" : "text-zinc-600"
+                                )}>
+                                  {driver.name}
+                                </td>
+                                <td className={cn(
+                                  "px-6 py-4 text-sm text-right font-bold",
+                                  driver.isPlanned ? "text-red-600" : "text-delijn-dark"
+                                )}>
+                                  {driver.count}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  {driver.isPlanned ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                      <RefreshCw size={10} className="animate-spin-slow" />
+                                      Gepland
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600">
+                                      Niet gepland
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-12 text-center text-zinc-500 italic">
+                                Geen chauffeurs gevonden die voldoen aan de criteria.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               ) : activePage === 'seniority' ? (
                 <div className="space-y-8">
                   <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
                     <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
-                      <Clock className="text-emerald-500" size={20} />
+                      <Clock className="text-delijn-yellow" size={20} />
                       Gemiddelde Schades per Dienstjaar Bundel
                     </h3>
                     {groupedSeniorityData.length > 0 ? (
@@ -1430,7 +1642,7 @@ export default function App() {
                             />
                             <Bar 
                               dataKey="avg" 
-                              fill="#10b981" 
+                              fill="#FFD200" 
                               radius={[4, 4, 0, 0]} 
                               name="Gemiddelde Schades"
                             />
@@ -1464,7 +1676,7 @@ export default function App() {
                             <tr key={idx} className="hover:bg-zinc-50/80 transition-colors">
                               <td className="px-6 py-4 text-sm font-medium text-zinc-900">{row.label}</td>
                               <td className="px-6 py-4 text-sm text-right text-zinc-600">{row.personCount}</td>
-                              <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">{row.avg}</td>
+                              <td className="px-6 py-4 text-sm text-right font-semibold text-delijn-dark">{row.avg}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1522,7 +1734,7 @@ export default function App() {
                                 >
                                   <td className="px-6 py-4 text-sm font-medium text-zinc-900">{vnr}</td>
                                   <td className="px-6 py-4 text-sm text-zinc-600">{vehicleInfo.type}</td>
-                                  <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">
+                                  <td className="px-6 py-4 text-sm text-right font-semibold text-delijn-dark">
                                     {vehicleInfo.count}
                                   </td>
                                 </motion.tr>
