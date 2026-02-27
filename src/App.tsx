@@ -1397,7 +1397,7 @@ export default function App() {
                   )}
 
                   {/* Detailed Table (Visible when searching on Dashboard) */}
-                  {searchQuery && (
+                  {(searchQuery || vehicleSearch) && (
                     <div className="space-y-6">
                       <div className="flex items-center gap-2 px-2">
                         <AlertCircle className="text-delijn-yellow" size={24} />
@@ -1406,7 +1406,7 @@ export default function App() {
                       <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
                         <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/30">
                           <h3 className="font-semibold text-zinc-900">
-                            Details voor Chauffeur: {searchQuery}
+                            Details voor: {searchQuery && vehicleSearch ? `Chauffeur ${searchQuery} & Voertuig ${vehicleSearch}` : searchQuery ? `Chauffeur ${searchQuery}` : `Voertuig ${vehicleSearch}`}
                           </h3>
                           <span className="text-xs text-zinc-500 font-medium bg-zinc-100 px-2 py-1 rounded-md">
                             {filteredData.length} incidenten gevonden
@@ -1485,10 +1485,10 @@ export default function App() {
                   <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/30">
                       <h3 className="font-semibold text-zinc-900">
-                        {searchQuery ? `Details voor Chauffeur: ${searchQuery}` : 'Topcrashers Overzicht'}
+                        {(searchQuery || vehicleSearch) ? `Details voor: ${searchQuery && vehicleSearch ? `Chauffeur ${searchQuery} & Voertuig ${vehicleSearch}` : searchQuery ? `Chauffeur ${searchQuery}` : `Voertuig ${vehicleSearch}`}` : 'Topcrashers Overzicht'}
                       </h3>
                       <span className="text-xs text-zinc-500 font-medium bg-zinc-100 px-2 py-1 rounded-md">
-                        {searchQuery 
+                        {(searchQuery || vehicleSearch) 
                           ? `${filteredData.length} incidenten gevonden`
                           : `${Object.keys(filteredData.reduce((acc, curr) => {
                               acc[curr.personeelsnr] = true;
