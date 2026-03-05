@@ -1139,7 +1139,7 @@ export default function App() {
                         </div>
                         <div className="h-[500px] w-full relative">
                           <ResponsiveContainer width="100%" height={500} debounce={100}>
-                            <BarChart data={stats.byMonthYear} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                            <LineChart data={stats.byMonthYear} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                               <XAxis 
                                 dataKey="month" 
@@ -1155,7 +1155,6 @@ export default function App() {
                                 interval={0}
                               />
                               <Tooltip 
-                                cursor={{ fill: '#f8fafc' }}
                                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                               />
                               <Legend 
@@ -1165,16 +1164,40 @@ export default function App() {
                                 formatter={(value) => `${value} (Totaal: ${yearTotals[value]})`}
                                 wrapperStyle={{ paddingBottom: '20px', fontSize: '13px', fontWeight: 'bold' }} 
                               />
-                              <Bar dataKey="2024" fill="#FFD200" radius={[4, 4, 0, 0]} name="2024">
-                                <LabelList dataKey="2024" position="top" offset={10} style={{ fontSize: '18px', fill: '#000000', fontWeight: '900' }} />
-                              </Bar>
-                              <Bar dataKey="2025" fill="#1A1A1A" radius={[4, 4, 0, 0]} name="2025">
-                                <LabelList dataKey="2025" position="top" offset={10} style={{ fontSize: '18px', fill: '#000000', fontWeight: '900' }} />
-                              </Bar>
-                              <Bar dataKey="2026" fill="#3b82f6" radius={[4, 4, 0, 0]} name="2026">
-                                <LabelList dataKey="2026" position="top" offset={10} style={{ fontSize: '18px', fill: '#000000', fontWeight: '900' }} />
-                              </Bar>
-                            </BarChart>
+                              <Line 
+                                type="monotone" 
+                                dataKey="2024" 
+                                stroke="#FFD200" 
+                                strokeWidth={3} 
+                                dot={{ r: 4, fill: '#FFD200' }} 
+                                activeDot={{ r: 6 }} 
+                                name="2024"
+                              >
+                                <LabelList dataKey="2024" position="top" offset={10} style={{ fontSize: '14px', fill: '#000000', fontWeight: 'bold' }} />
+                              </Line>
+                              <Line 
+                                type="monotone" 
+                                dataKey="2025" 
+                                stroke="#1A1A1A" 
+                                strokeWidth={3} 
+                                dot={{ r: 4, fill: '#1A1A1A' }} 
+                                activeDot={{ r: 6 }} 
+                                name="2025"
+                              >
+                                <LabelList dataKey="2025" position="top" offset={10} style={{ fontSize: '14px', fill: '#000000', fontWeight: 'bold' }} />
+                              </Line>
+                              <Line 
+                                type="monotone" 
+                                dataKey="2026" 
+                                stroke="#3b82f6" 
+                                strokeWidth={3} 
+                                dot={{ r: 4, fill: '#3b82f6' }} 
+                                activeDot={{ r: 6 }} 
+                                name="2026"
+                              >
+                                <LabelList dataKey="2026" position="top" offset={10} style={{ fontSize: '14px', fill: '#000000', fontWeight: 'bold' }} />
+                              </Line>
+                            </LineChart>
                           </ResponsiveContainer>
                         </div>
                       </div>
