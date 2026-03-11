@@ -682,8 +682,8 @@ export default function App() {
     return Object.entries(driverStats)
       .filter(([pNr, stats]) => {
         const normalizedPNr = normalizePNr(pNr);
-        // More than 2 incidents AND not in completed list
-        return stats.count > 2 && !completedPNrs.has(normalizedPNr);
+        // More than 3 incidents AND not in completed list
+        return stats.count > 3 && !completedPNrs.has(normalizedPNr);
       })
       .map(([pNr, stats]) => {
         const normalizedPNr = normalizePNr(pNr);
@@ -1712,7 +1712,7 @@ export default function App() {
                       <div className="text-sm">
                         <p className="font-semibold">Criteria voor coaching:</p>
                         <ul className="list-disc list-inside mt-1 opacity-90">
-                          <li>Meer dan 2 schades in de geselecteerde periode.</li>
+                          <li>Meer dan 3 schades in de geselecteerde periode.</li>
                           <li>Nog geen voltooide coaching geregistreerd.</li>
                         </ul>
                       </div>
