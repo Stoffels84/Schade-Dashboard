@@ -219,13 +219,30 @@ export default function App() {
       .sort((a, b) => a.sortKey - b.sortKey);
   }, [seniorityData]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [vehicleSearch, setVehicleSearch] = useState('');
+  const [debouncedVehicleSearch, setDebouncedVehicleSearch] = useState('');
   const [typeSearch, setTypeSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ftpStatus, setFtpStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  // Debounce search inputs
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedVehicleSearch(vehicleSearch);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [vehicleSearch]);
 
   const parseExcelDate = (d: any): Date | null => {
     if (!d) return null;
@@ -442,53 +459,34 @@ export default function App() {
   };
 
   const filteredData = useMemo(() => {
+    const q = debouncedSearchQuery.toLowerCase();
+    const v = debouncedVehicleSearch.toLowerCase();
+
+    const start = startDate ? new Date(startDate) : null;
+    if (start) start.setHours(0, 0, 0, 0);
+
+    const end = endDate ? new Date(endDate) : null;
+    if (end) end.setHours(23, 59, 59, 999);
+
     return data.filter(item => {
-      const matchesSearch = !searchQuery || item.personeelsnr.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesVehicle = !vehicleSearch || item.bus_tram.toLowerCase().includes(vehicleSearch.toLowerCase());
+      const matchesSearch = !debouncedSearchQuery || item.personeelsnr.toLowerCase().includes(q);
+      const matchesVehicle = !debouncedVehicleSearch || item.bus_tram.toLowerCase().includes(v);
       const matchesType = !typeSearch || item.type === typeSearch;
       
       let matchesDate = true;
-      if (startDate || endDate) {
-        let itemDate: Date | null = null;
-        
-        // Handle ISO strings or strings with time
-        const datePart = item.datum.includes('T') ? item.datum.split('T')[0] : item.datum;
-        const parts = datePart.split(/[-/]/).map(p => parseInt(p, 10));
-        
-        if (parts.length === 3) {
-          if (parts[0] > 1000) {
-            // YYYY-MM-DD
-            itemDate = new Date(parts[0], parts[1] - 1, parts[2]);
-          } else {
-            // DD-MM-YYYY
-            itemDate = new Date(parts[2], parts[1] - 1, parts[0]);
-          }
-        } else {
-          // Final fallback
-          const fallback = new Date(item.datum);
-          if (!isNaN(fallback.getTime())) {
-            itemDate = fallback;
-          }
-        }
-
+      if (start || end) {
+        const itemDate = item.parsedDate;
         if (itemDate && !isNaN(itemDate.getTime())) {
-          if (startDate) {
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0);
-            if (itemDate < start) matchesDate = false;
-          }
-          
-          if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            if (itemDate > end) matchesDate = false;
-          }
+          if (start && itemDate < start) matchesDate = false;
+          if (end && itemDate > end) matchesDate = false;
+        } else {
+          matchesDate = false;
         }
       }
 
       return matchesSearch && matchesVehicle && matchesType && matchesDate;
     });
-  }, [data, searchQuery, vehicleSearch, typeSearch, startDate, endDate]);
+  }, [data, debouncedSearchQuery, debouncedVehicleSearch, typeSearch, startDate, endDate]);
 
   const uniqueTypes = useMemo(() => {
     const types = new Set<string>();
