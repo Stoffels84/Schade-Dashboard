@@ -1,0 +1,23 @@
+{
+  "name": "OT Gent - Schade Dashboard",
+  "short_name": "OT Gent",
+  "description": "Dashboard voor schade-analyse en coaching bij OT Gent",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FFD200",
+  "icons": [
+    {
+      "src": "/api/logo",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/api/logo",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
