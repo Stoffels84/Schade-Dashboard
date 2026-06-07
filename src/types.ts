@@ -9,6 +9,10 @@ export interface DamageRecord {
   damageType: string; // This is the damage description
   bus_tram: string; // This is the mode (Bus or Tram)
   rawData: any;
+  schadejaar?: string;
+  leeftijdBijSchade?: string;
+  ancieniteitsgroep?: string;
+  leeftijdsgroep?: string;
 }
 
 export interface DashboardStats {

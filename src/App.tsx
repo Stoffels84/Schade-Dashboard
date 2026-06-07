@@ -58,7 +58,9 @@ const EXCLUDED_HEADERS = [
   'bus/tram', 'Bus/Tram', 'Voertuig', 'voertuig',
   'Type', 'type',
   'link', 'Link',
-  'TEAMCOACH', 'Teamcoach', 'teamcoach'
+  'TEAMCOACH', 'Teamcoach', 'teamcoach',
+  'schadejaar', 'leeftijd bij schade', 'ancieniteitsgroep', 'leeftijdsgroep',
+  'uniek/totaal', 'uniek schadejaar', 'maandnummer', 'totaal', 'uniek/schadejaar'
 ].map(h => h.toLowerCase().trim());
 
 function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) => void, isLoading: boolean }) {
@@ -352,6 +354,11 @@ export default function App() {
       const rawDate = findValue(row, ['Datum', 'Date', 'Incident Datum', 'Tijdstip', 'Dag'], true);
       const parsedDate = parseExcelDate(rawDate);
 
+      const schadejaarVal = findValue(row, ['Schadejaar', 'Schade jaar', 'Jaar'], true);
+      const leeftijdBijSchadeVal = findValue(row, ['leeftijd bij schade', 'Leeftijd bij schade', 'Leeftijd'], true);
+      const ancieniteitsgroepVal = findValue(row, ['Ancieniteitsgroep', 'Ancieniteit groep', 'Ancieniteit'], true);
+      const leeftijdsgroepVal = findValue(row, ['Leeftijdsgroep', 'Leeftijd groep'], true);
+
       return {
         personeelsnr: String(findValue(row, ['personeelsnr', 'ID', 'stamnr', 'stamnummer', 'P-nr', 'Personeels Nr', 'Chauffeur ID', 'Bestuurder ID', 'Stam Nr'], true) || '').trim(),
         naam: String(
@@ -366,6 +373,10 @@ export default function App() {
         damageType: damageTypeValue || 'Onbekend',
         bus_tram: busTramMode || 'Onbekend',
         rawData: row,
+        schadejaar: schadejaarVal !== undefined ? String(schadejaarVal).trim() : '',
+        leeftijdBijSchade: leeftijdBijSchadeVal !== undefined ? String(leeftijdBijSchadeVal).trim() : '',
+        ancieniteitsgroep: ancieniteitsgroepVal !== undefined ? String(ancieniteitsgroepVal).trim() : '',
+        leeftijdsgroep: leeftijdsgroepVal !== undefined ? String(leeftijdsgroepVal).trim() : '',
       };
     }).filter(r => {
       // Keep any row that has at least some identifiable data
@@ -1442,6 +1453,10 @@ export default function App() {
                                 <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Datum</th>
                                 <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Bus/tram</th>
                                 <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Type</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Schadejaar</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Leeftijd bij schade</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Ancieniteitsgroep</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Leeftijdsgroep</th>
                                 <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Link</th>
                                 {headers
                                   .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
@@ -1469,6 +1484,10 @@ export default function App() {
                                     </td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">{record.bus_tram}</td>
                                     <td className="px-6 py-4 text-sm text-zinc-600">{record.type}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{record.schadejaar || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{record.leeftijdBijSchade || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{record.ancieniteitsgroep || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-zinc-600">{record.leeftijdsgroep || '-'}</td>
                                     <td className="px-6 py-4 text-sm">
                                       {record.link && record.link !== 'undefined' ? (
                                         <a 
@@ -1530,6 +1549,10 @@ export default function App() {
                               <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Datum</th>
                               <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Bus/tram</th>
                               <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Type</th>
+                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Schadejaar</th>
+                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Leeftijd bij schade</th>
+                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Ancieniteitsgroep</th>
+                              <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Leeftijdsgroep</th>
                               <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Link</th>
                               {headers
                                 .filter(h => !EXCLUDED_HEADERS.includes(h.toLowerCase().trim()))
@@ -1557,6 +1580,10 @@ export default function App() {
                                     </td>
                                   <td className="px-6 py-4 text-sm text-zinc-600">{record.bus_tram}</td>
                                   <td className="px-6 py-4 text-sm text-zinc-600">{record.type}</td>
+                                  <td className="px-6 py-4 text-sm text-zinc-600">{record.schadejaar || '-'}</td>
+                                  <td className="px-6 py-4 text-sm text-zinc-600">{record.leeftijdBijSchade || '-'}</td>
+                                  <td className="px-6 py-4 text-sm text-zinc-600">{record.ancieniteitsgroep || '-'}</td>
+                                  <td className="px-6 py-4 text-sm text-zinc-600">{record.leeftijdsgroep || '-'}</td>
                                   <td className="px-6 py-4 text-sm">
                                     {record.link && record.link !== 'undefined' ? (
                                       <a 
