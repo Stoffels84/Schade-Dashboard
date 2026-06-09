@@ -170,10 +170,9 @@ function Login({ onLogin, isLoading }: { onLogin: (user: string, pass: string) =
 }
 
 export default function App() {
-  const [activePage, setActivePage] = useState<'dashboard' | 'topcrashers' | 'locatie' | 'voertuig' | 'seniority' | 'coaching'>('dashboard');
+  const [activePage, setActivePage] = useState<'dashboard' | 'topcrashers' | 'coaching'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [data, setData] = useState<DamageRecord[]>([]);
-  const [seniorityData, setSeniorityData] = useState<any[]>([]);
   const [personnelInfo, setPersonnelInfo] = useState<any>(null);
   const [coachingData, setCoachingData] = useState<{ requested: any[], completed: any[] }>({ requested: [], completed: [] });
   const [personnelStatus, setPersonnelStatus] = useState<string>('idle');
@@ -184,42 +183,7 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [conversationsData, setConversationsData] = useState<any[]>([]);
 
-  const groupedSeniorityData = useMemo(() => {
-    if (!seniorityData.length) return [];
 
-    const bins: Record<string, { total: number; count: number }> = {};
-    
-    seniorityData.forEach(item => {
-      const years = parseInt(item.Dienstjaren);
-      const schades = parseFloat(item.schades);
-      if (isNaN(years) || isNaN(schades)) return;
-      
-      let label = "";
-      if (years <= 5) {
-        label = "0 tot 5";
-      } else {
-        const binIndex = Math.ceil((years - 5) / 5);
-        const start = 5 + (binIndex - 1) * 5 + 1;
-        const end = 5 + binIndex * 5;
-        label = `${start} tot ${end}`;
-      }
-      
-      if (!bins[label]) {
-        bins[label] = { total: 0, count: 0 };
-      }
-      bins[label].total += schades;
-      bins[label].count += 1;
-    });
-
-    return Object.entries(bins)
-      .map(([label, data]) => ({ 
-        label, 
-        avg: parseFloat((data.total / data.count).toFixed(2)), 
-        personCount: data.count,
-        sortKey: label === "0 tot 5" ? 0 : parseInt(label.split(' ')[0])
-      }))
-      .sort((a, b) => a.sortKey - b.sortKey);
-  }, [seniorityData]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -395,9 +359,6 @@ export default function App() {
       const result = await response.json();
       if (result.success) {
         processRawData(result.data);
-        if (result.seniorityData) {
-          setSeniorityData(result.seniorityData);
-        }
         if (result.personnelData) {
           setPersonnelInfo(result.personnelData);
         }
@@ -789,39 +750,6 @@ export default function App() {
           >
             <Trophy size={20} />
             {isSidebarOpen && <span className="ml-3 font-medium">Topcrashers</span>}
-          </button>
-
-          <button
-            onClick={() => setActivePage('locatie')}
-            className={cn(
-              "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
-              activePage === 'locatie' ? "bg-delijn-yellow text-delijn-dark" : "hover:bg-zinc-800 hover:text-zinc-200"
-            )}
-          >
-            <MapPin size={20} />
-            {isSidebarOpen && <span className="ml-3 font-medium">Locatie</span>}
-          </button>
-
-          <button
-            onClick={() => setActivePage('voertuig')}
-            className={cn(
-              "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
-              activePage === 'voertuig' ? "bg-delijn-yellow text-delijn-dark" : "hover:bg-zinc-800 hover:text-zinc-200"
-            )}
-          >
-            <Bus size={20} />
-            {isSidebarOpen && <span className="ml-3 font-medium">Voertuig</span>}
-          </button>
-
-          <button
-            onClick={() => setActivePage('seniority')}
-            className={cn(
-              "w-full flex items-center px-3 py-2 rounded-lg transition-colors",
-              activePage === 'seniority' ? "bg-delijn-yellow text-delijn-dark" : "hover:bg-zinc-800 hover:text-zinc-200"
-            )}
-          >
-            <Clock size={20} />
-            {isSidebarOpen && <span className="ml-3 font-medium">Anciënniteit</span>}
           </button>
 
           <button
@@ -1658,61 +1586,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              ) : activePage === 'locatie' ? (
-                <div className="space-y-8">
-                  {/* Locatie Page Content */}
-                  <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/30">
-                      <h3 className="font-semibold text-zinc-900">
-                        Overzicht per Locatie
-                      </h3>
-                      <span className="text-xs text-zinc-500 font-medium bg-zinc-100 px-2 py-1 rounded-md">
-                        {Object.keys(filteredData.reduce((acc, curr) => {
-                          acc[curr.locatie] = true;
-                          return acc;
-                        }, {} as Record<string, boolean>)).length} unieke locaties
-                      </span>
-                    </div>
-                    
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-zinc-50/50">
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Locatie</th>
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Aantal Schades</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-100">
-                          <AnimatePresence mode="popLayout">
-                            {Object.entries(
-                              filteredData.reduce((acc, curr) => {
-                                const loc = curr.locatie || 'Onbekend';
-                                acc[loc] = (acc[loc] || 0) + 1;
-                                return acc;
-                              }, {} as Record<string, number>)
-                            )
-                            .sort((a, b) => (b[1] as number) - (a[1] as number))
-                            .map(([loc, count]) => (
-                              <motion.tr 
-                                key={loc}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="hover:bg-zinc-50/80 transition-colors group"
-                              >
-                                <td className="px-6 py-4 text-sm font-medium text-zinc-900">{loc}</td>
-                                <td className="px-6 py-4 text-sm text-right font-semibold text-delijn-dark">
-                                  {count}
-                                </td>
-                              </motion.tr>
-                            ))}
-                          </AnimatePresence>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              ) : activePage === 'coaching' ? (
+              ) : (
                 <div className="space-y-8">
                   <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
                     <div className="flex items-center justify-between mb-6">
@@ -1806,141 +1680,6 @@ export default function App() {
                               </td>
                             </tr>
                           )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              ) : activePage === 'seniority' ? (
-                <div className="space-y-8">
-                  <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
-                    <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
-                      <Clock className="text-delijn-yellow" size={20} />
-                      Gemiddelde Schades per Dienstjaar Bundel
-                    </h3>
-                    {groupedSeniorityData.length > 0 ? (
-                      <div className="h-[400px] w-full relative">
-                        <ResponsiveContainer width="100%" height={400} debounce={100}>
-                          <BarChart data={groupedSeniorityData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis 
-                              dataKey="label" 
-                              axisLine={false} 
-                              tickLine={false} 
-                              tick={{ fill: '#71717a', fontSize: 12 }}
-                              label={{ value: 'Dienstjaren Bundels', position: 'insideBottom', offset: -5 }}
-                            />
-                            <YAxis 
-                              axisLine={false} 
-                              tickLine={false} 
-                              tick={{ fill: '#71717a', fontSize: 12 }}
-                            />
-                            <Tooltip 
-                              contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                              cursor={{ fill: '#f4f4f5' }}
-                              formatter={(value: number) => [`${value}`, 'Gemiddelde Schades']}
-                            />
-                            <Bar 
-                              dataKey="avg" 
-                              fill="#FFD200" 
-                              radius={[4, 4, 0, 0]} 
-                              name="Gemiddelde Schades"
-                            />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      <div className="h-[400px] flex flex-col items-center justify-center text-zinc-500 bg-zinc-50 rounded-xl border border-dashed border-zinc-200">
-                        <Database size={40} className="mb-4 opacity-20" />
-                        <p>Geen data gevonden in tabblad "schades-dienstjaar"</p>
-                        <p className="text-xs mt-2">Controleer of de kolommen "Dienstjaren" en "schades" heten.</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-zinc-100 bg-zinc-50/30">
-                      <h3 className="font-semibold text-zinc-900">Details Tabel</h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-zinc-50/50">
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Bundel (Dienstjaren)</th>
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Aantal Personen</th>
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Gemiddelde Schades</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-100">
-                          {groupedSeniorityData.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-zinc-50/80 transition-colors">
-                              <td className="px-6 py-4 text-sm font-medium text-zinc-900">{row.label}</td>
-                              <td className="px-6 py-4 text-sm text-right text-zinc-600">{row.personCount}</td>
-                              <td className="px-6 py-4 text-sm text-right font-semibold text-delijn-dark">{row.avg}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  {/* Voertuig Page Content */}
-                  <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/30">
-                      <h3 className="font-semibold text-zinc-900">
-                        Overzicht per Voertuig
-                      </h3>
-                      <span className="text-xs text-zinc-500 font-medium bg-zinc-100 px-2 py-1 rounded-md">
-                        {Object.keys(filteredData.reduce((acc, curr) => {
-                          acc[curr.bus_tram] = true;
-                          return acc;
-                        }, {} as Record<string, boolean>)).length} unieke voertuigen
-                      </span>
-                    </div>
-                    
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-zinc-50/50">
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Voertuignr</th>
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Type</th>
-                            <th className="px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Aantal Schades</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-100">
-                          <AnimatePresence mode="popLayout">
-                            {Object.entries(
-                              filteredData.reduce((acc, curr) => {
-                                const vnr = curr.bus_tram || 'Onbekend';
-                                if (!acc[vnr]) {
-                                  acc[vnr] = { type: curr.type, count: 0 };
-                                }
-                                acc[vnr].count += 1;
-                                return acc;
-                              }, {} as Record<string, { type: string; count: number }>)
-                            )
-                            .sort((a, b) => (b[1] as { count: number }).count - (a[1] as { count: number }).count)
-                            .map(([vnr, info]) => {
-                              const vehicleInfo = info as { type: string; count: number };
-                              return (
-                                <motion.tr 
-                                  key={vnr}
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  className="hover:bg-zinc-50/80 transition-colors group"
-                                >
-                                  <td className="px-6 py-4 text-sm font-medium text-zinc-900">{vnr}</td>
-                                  <td className="px-6 py-4 text-sm text-zinc-600">{vehicleInfo.type}</td>
-                                  <td className="px-6 py-4 text-sm text-right font-semibold text-delijn-dark">
-                                    {vehicleInfo.count}
-                                  </td>
-                                </motion.tr>
-                              );
-                            })}
-                          </AnimatePresence>
                         </tbody>
                       </table>
                     </div>
