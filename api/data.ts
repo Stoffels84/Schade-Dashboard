@@ -8,7 +8,7 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  const client = new ftp.Client();
+  const client = new ftp.Client(5000); // 5 seconds timeout to prevent infinite hang
   client.ftp.verbose = false;
   
   try {

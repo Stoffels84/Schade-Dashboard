@@ -2,7 +2,7 @@ import * as ftp from "basic-ftp";
 import { Stream } from "stream";
 
 export default async function handler(req: any, res: any) {
-  const client = new ftp.Client();
+  const client = new ftp.Client(5000); // 5 seconds timeout to prevent infinite hang
   client.ftp.verbose = false;
   
   try {
