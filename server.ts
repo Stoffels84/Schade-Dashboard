@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import path from "path";
 import dataHandler from "./api/data.js";
 import logoHandler from "./api/logo.js";
 import * as ftp from "basic-ftp";
@@ -40,7 +41,11 @@ async function setupVite() {
     app.use(vite.middlewares);
   } else {
     // In production, serve static files from dist
-    app.use(express.static("dist"));
+    const distPath = path.resolve(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
